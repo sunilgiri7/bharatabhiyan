@@ -1,0 +1,97 @@
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.db import models
+from django.utils import timezone
+
+
+class UserManager(BaseUserManager):
+    def create_user(self, phone, password=None, **extra_fields):
+        if not phone:
+            raise ValueError('Phone number is required')
+        
+        user = self.model(phone=phone, **extra_fields)
+        if password:
+            user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, phone, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('is_admin', True)
+        
+        return self.create_user(phone, password, **extra_fields)
+
+
+class User(AbstractBaseUser, PermissionsMixin):
+    phone = models.CharField(max_length=15, unique=True)
+    email = models.EmailField(unique=True, null=True, blank=True)
+    name = models.CharField(max_length=255)
+    
+    # Role flags
+    is_admin = models.BooleanField(default=False)
+    is_captain = models.BooleanField(default=False)
+    
+    # Status flags
+    is_active = models.BooleanField(default=False)  # Activated after ₹100 payment
+    is_staff = models.BooleanField(default=False)
+    
+    date_joined = models.DateTimeField(default=timezone.now)
+    
+    objects = UserManager()
+    
+    USERNAME_FIELD = 'phone'
+    REQUIRED_FIELDS = ['name']
+    
+    class Meta:
+        db_table = 'users'
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
+    
+    def __str__(self):
+        return f"{self.name} ({self.phone})"
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    address = models.TextField(blank=True)
+    city = models.ForeignKey('locations.Location', on_delete=models.SET_NULL, null=True, blank=True)
+    pincode = models.CharField(max_length=10, blank=True)
+    kyc_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('PENDING', 'Pending'),
+            ('VERIFIED', 'Verified'),
+            ('REJECTED', 'Rejected')
+        ],
+        default='PENDING'
+    )
+    
+    class Meta:
+        db_table = 'user_profiles'
+    
+    def __str__(self):
+        return f"Profile of {self.user.name}"
+
+
+class RegistrationPayment(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('SUCCESS', 'Success'),
+        ('FAILED', 'Failed'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='registration_payments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=100.00)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    gateway_ref = models.CharField(max_length=255, blank=True)
+    gateway_order_id = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'registration_payments'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Payment {self.id} - {self.user.name} - {self.status}"

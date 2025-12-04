@@ -1,0 +1,16 @@
+📁 Project Structure
+bharatabhiyan/
+├── bharatabhiyan/
+│   ├── settings.py    (update with provided config)
+│   └── urls.py        (main URL config)
+├── accounts/
+│   ├── models.py      (User, UserProfile, RegistrationPayment)
+│   ├── backends.py    (PhoneBackend for phone auth)
+│   └── admin.py       (Admin configuration)
+├── locations/
+│   └── models.py      (Location model)
+├── apis/
+│   ├── serializers.py (All serializers)
+│   ├── views.py       (Auth views)
+│   └── urls.py        (API routes)
+└── requirements.txt
