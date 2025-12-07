@@ -4,6 +4,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
+from django.shortcuts import render, redirect
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
 from .serializers import (
     UserRegistrationSerializer, 
     UserLoginSerializer, 
@@ -11,9 +14,12 @@ from .serializers import (
     RegistrationPaymentSerializer
 )
 from accounts.models import RegistrationPayment
-import uuid
+import stripe
 
 User = get_user_model()
+
+# Initialize Stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 def get_tokens_for_user(user):
@@ -106,11 +112,6 @@ def login(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
-    """
-    Get current user details
-    GET /api/auth/me
-    Headers: Authorization: Bearer <access_token>
-    """
     user = request.user
     serializer = UserSerializer(user)
     
@@ -122,13 +123,7 @@ def me(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def create_registration_payment_order(request):
-    """
-    Create payment order for registration (₹100)
-    POST /api/payments/registration/create-order
-    Body: {user_id}
-    Returns: payment order details
-    """
+def create_registration_payment_checkout(request):
     user_id = request.data.get('user_id')
     
     if not user_id:
@@ -157,83 +152,205 @@ def create_registration_payment_order(request):
         status='PENDING'
     ).first()
     
-    if existing_payment:
-        serializer = RegistrationPaymentSerializer(existing_payment)
+    if existing_payment and existing_payment.gateway_order_id:
+        # Return existing checkout URL if still valid
         return Response({
             'success': True,
-            'message': 'Payment order already exists',
-            'payment': serializer.data,
-            'gateway_order_id': existing_payment.gateway_order_id
+            'message': 'Payment session already exists',
+            'checkout_url': existing_payment.gateway_order_id,
+            'payment_id': existing_payment.id
         }, status=status.HTTP_200_OK)
     
-    # Create new payment record
-    gateway_order_id = f"order_{uuid.uuid4().hex[:12]}"  # Mock order ID
-    
-    payment = RegistrationPayment.objects.create(
-        user=user,
-        amount=100.00,
-        status='PENDING',
-        gateway_order_id=gateway_order_id
-    )
-    
-    serializer = RegistrationPaymentSerializer(payment)
-    
-    return Response({
-        'success': True,
-        'message': 'Payment order created',
-        'payment': serializer.data,
-        'gateway_order_id': gateway_order_id,
-        'amount': 100.00
-    }, status=status.HTTP_201_CREATED)
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def verify_registration_payment(request):
-    """
-    Verify payment and activate user account
-    POST /api/payments/registration/verify
-    Body: {user_id, gateway_order_id, gateway_ref}
-    """
-    user_id = request.data.get('user_id')
-    gateway_order_id = request.data.get('gateway_order_id')
-    gateway_ref = request.data.get('gateway_ref')
-    
-    if not all([user_id, gateway_order_id]):
+    try:
+        # Create Stripe Checkout Session
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'inr',
+                    'unit_amount': 10000,  # ₹100 in paise
+                    'product_data': {
+                        'name': 'BharatAbhiyan Registration Fee',
+                        'description': 'One-time registration fee to activate your account',
+                    },
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=f'{settings.PAYMENT_SUCCESS_URL}?session_id={{CHECKOUT_SESSION_ID}}',
+            cancel_url=f'{settings.PAYMENT_FAILURE_URL}?user_id={user_id}',
+            client_reference_id=str(user_id),
+            metadata={
+                'user_id': user_id,
+                'payment_type': 'registration'
+            }
+        )
+        
+        # Create or update payment record
+        if existing_payment:
+            existing_payment.gateway_order_id = checkout_session.url
+            existing_payment.gateway_ref = checkout_session.id
+            existing_payment.save()
+            payment = existing_payment
+        else:
+            payment = RegistrationPayment.objects.create(
+                user=user,
+                amount=100.00,
+                status='PENDING',
+                gateway_order_id=checkout_session.url,
+                gateway_ref=checkout_session.id
+            )
+        
+        return Response({
+            'success': True,
+            'message': 'Checkout session created',
+            'checkout_url': checkout_session.url,
+            'payment_id': payment.id
+        }, status=status.HTTP_201_CREATED)
+        
+    except stripe.error.StripeError as e:
         return Response({
             'success': False,
-            'message': 'user_id and gateway_order_id are required'
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'message': f'Payment error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+def payment_success(request):
+    """
+    Handle successful payment redirect from Stripe
+    GET /payment/success?session_id=xxx
+    """
+    session_id = request.GET.get('session_id')
+    
+    if not session_id:
+        return render(request, 'payment_error.html', {
+            'error_message': 'Invalid payment session'
+        })
     
     try:
-        user = User.objects.get(id=user_id)
-        payment = RegistrationPayment.objects.get(
-            user=user,
-            gateway_order_id=gateway_order_id,
-            status='PENDING'
+        # Retrieve the session from Stripe
+        session = stripe.checkout.Session.retrieve(session_id)
+        
+        if session.payment_status == 'paid':
+            user_id = session.client_reference_id or session.metadata.get('user_id')
+            
+            # Find user and payment record
+            user = User.objects.get(id=user_id)
+            payment = RegistrationPayment.objects.filter(
+                user=user,
+                gateway_ref=session_id
+            ).first()
+            
+            if not payment:
+                # Try to find by session id in gateway_ref
+                payment = RegistrationPayment.objects.filter(
+                    user=user,
+                    status='PENDING'
+                ).first()
+            
+            if payment:
+                # Update payment status
+                payment.status = 'SUCCESS'
+                payment.gateway_ref = session_id
+                payment.save()
+            
+            # Activate user account
+            if not user.is_active:
+                user.is_active = True
+                user.save()
+            
+            # Generate tokens for the user
+            tokens = get_tokens_for_user(user)
+            
+            return render(request, 'payment_success.html', {
+                'user': user,
+                'access_token': tokens['access'],
+                'refresh_token': tokens['refresh'],
+                'frontend_url': settings.FRONTEND_URL
+            })
+        else:
+            return render(request, 'payment_error.html', {
+                'error_message': 'Payment not completed'
+            })
+            
+    except stripe.error.StripeError as e:
+        return render(request, 'payment_error.html', {
+            'error_message': f'Payment verification failed: {str(e)}'
+        })
+    except User.DoesNotExist:
+        return render(request, 'payment_error.html', {
+            'error_message': 'User not found'
+        })
+    except Exception as e:
+        return render(request, 'payment_error.html', {
+            'error_message': f'An error occurred: {str(e)}'
+        })
+
+
+@csrf_exempt
+def payment_failure(request):
+    """
+    Handle failed/cancelled payment redirect from Stripe
+    GET /payment/failure?user_id=xxx
+    """
+    user_id = request.GET.get('user_id')
+    
+    context = {
+        'frontend_url': settings.FRONTEND_URL,
+        'user_id': user_id
+    }
+    
+    return render(request, 'payment_failure.html', context)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def stripe_webhook(request):
+    """
+    Handle Stripe webhook events (optional but recommended)
+    POST /api/payments/webhook
+    """
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
-    except (User.DoesNotExist, RegistrationPayment.DoesNotExist):
-        return Response({
-            'success': False,
-            'message': 'Invalid payment details'
-        }, status=status.HTTP_404_NOT_FOUND)
+    except ValueError:
+        return Response({'error': 'Invalid payload'}, status=400)
+    except stripe.error.SignatureVerificationError:
+        return Response({'error': 'Invalid signature'}, status=400)
     
-    # Update payment status
-    payment.status = 'SUCCESS'
-    payment.gateway_ref = gateway_ref or ''
-    payment.save()
+    # Handle the checkout.session.completed event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        
+        if session.payment_status == 'paid':
+            user_id = session.client_reference_id or session.metadata.get('user_id')
+            
+            try:
+                user = User.objects.get(id=user_id)
+                
+                # Update payment
+                payment = RegistrationPayment.objects.filter(
+                    user=user,
+                    status='PENDING'
+                ).first()
+                
+                if payment:
+                    payment.status = 'SUCCESS'
+                    payment.gateway_ref = session.id
+                    payment.save()
+                
+                # Activate user
+                if not user.is_active:
+                    user.is_active = True
+                    user.save()
+                    
+            except User.DoesNotExist:
+                pass
     
-    # Activate user account
-    user.is_active = True
-    user.save()
-    
-    # Generate tokens for automatic login
-    tokens = get_tokens_for_user(user)
-    user_data = UserSerializer(user).data
-    
-    return Response({
-        'success': True,
-        'message': 'Payment verified and account activated successfully',
-        'user': user_data,
-        'tokens': tokens
-    }, status=status.HTTP_200_OK)
+    return Response({'status': 'success'}, status=200)
