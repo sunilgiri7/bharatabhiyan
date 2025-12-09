@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Payment - BharatAbhiyan</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .payment-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 450px;
+            width: 90%;
+            padding: 40px;
+            text-align: center;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        h1 {
+            color: #1f2937;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .amount {
+            font-size: 48px;
+            font-weight: 800;
+            color: #10b981;
+            margin: 20px 0;
+        }
+        .description {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .payment-methods {
+            background: #f3f4f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .payment-methods h5 {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .method-icons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .method-icon {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+        }
+        .btn-pay {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: 10px;
+            color: white;
+            width: 100%;
+            transition: transform 0.2s;
+        }
+        .btn-pay:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        .secure-badge {
+            margin-top: 20px;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .secure-badge svg {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+        .spinner-border {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-card">
+        <div class="logo">BA</div>
+        <h1>Complete Your Payment</h1>
+        <div class="amount">₹100</div>
+        <p class="description">One-time registration fee to activate your BharatAbhiyan account</p>
+        
+        <div class="payment-methods">
+            <h5>Accepted Payment Methods</h5>
+            <div class="method-icons">
+                <span class="method-icon">🏦 UPI</span>
+                <span class="method-icon">💳 Cards</span>
+                <span class="method-icon">🏛️ Net Banking</span>
+                <span class="method-icon">📱 Wallets</span>
+            </div>
+        </div>
+        
+        <button id="payButton" class="btn btn-pay">
+            Pay ₹100 Securely
+        </button>
+        
+        <div class="loading">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2" style="color: #6b7280;">Processing payment...</p>
+        </div>
+        
+        <div class="secure-badge">
+            <svg fill="none" stroke="#10b981" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+            </svg>
+            Secured by Razorpay
+        </div>
+    </div>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script>
+        // This page is used if you want to show a custom payment page
+        // Otherwise, you can directly trigger Razorpay from React frontend
+        
+        document.getElementById('payButton').addEventListener('click', function() {
+            // Show loading
+            document.querySelector('.loading').style.display = 'block';
+            document.getElementById('payButton').disabled = true;
+            
+            // Get order details from backend (implement this in your flow)
+            alert('This is a template. Integrate with your backend to get order details.');
+        });
+    </script>
+</body>
+</html>

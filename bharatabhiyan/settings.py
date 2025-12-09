@@ -127,14 +127,12 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# Stripe Configuration
-STRIPE_PUBLIC_KEY = 'pk_test_your_publishable_key_here'
-STRIPE_SECRET_KEY = 'sk_test_your_secret_key_here'
-STRIPE_WEBHOOK_SECRET = 'whsec_your_webhook_secret_here'  
+# Razorpay Configuration (Get from https://dashboard.razorpay.com)
+RAZORPAY_KEY_ID = 'rzp_test_your_key_id_here'
+RAZORPAY_KEY_SECRET = 'your_key_secret_here'
 
 # Frontend URLs for redirect
 FRONTEND_URL = 'http://localhost:3000'  # Your React app URL
 
-# Payment Success/Failure URLs (Backend serves these)
-PAYMENT_SUCCESS_URL = 'http://0.0.0.0:8000/payment/success'
-PAYMENT_FAILURE_URL = 'http://0.0.0.0:8000/payment/failure'
+# Base URL for callback
+BASE_URL = 'http://0.0.0.0:8080'

@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -87,7 +87,7 @@
             color: #1f2937;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             border: none;
             padding: 12px 40px;
             font-size: 16px;
@@ -97,15 +97,15 @@
         }
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.4);
         }
-        .token-info {
+        .countdown-info {
             margin-top: 20px;
             padding: 15px;
-            background: #fef3c7;
+            background: #dbeafe;
             border-radius: 10px;
-            font-size: 12px;
-            color: #92400e;
+            font-size: 14px;
+            color: #1e40af;
         }
     </style>
 </head>
@@ -117,37 +117,33 @@
             </svg>
         </div>
         
-        <h1>Payment Successful!</h1>
+        <h1>पेमेंट सफल! 🎉</h1>
         <p class="message">
-            Your account has been activated successfully. Welcome to BharatAbhiyan!
+            आपका अकाउंट एक्टिवेट हो गया है। BharatAbhiyan में आपका स्वागत है!
         </p>
         
         <div class="user-info">
-            <p><strong>Name:</strong> {{ user.name }}</p>
-            <p><strong>Phone:</strong> {{ user.phone }}</p>
-            <p><strong>Status:</strong> <span class="badge bg-success">Active</span></p>
+            <p><strong>नाम:</strong> {{ user.name }}</p>
+            <p><strong>फोन:</strong> {{ user.phone }}</p>
+            <p><strong>स्टेटस:</strong> <span class="badge bg-success">Active</span></p>
         </div>
         
         <button class="btn btn-primary" onclick="redirectToApp()">
-            Continue to Dashboard
+            डैशबोर्ड पर जाएं
         </button>
         
-        <div class="token-info">
-            <strong>Auto-redirect in <span id="countdown">5</span> seconds...</strong>
+        <div class="countdown-info">
+            <strong><span id="countdown">5</span> सेकंड में आपको अपने आप redirect कर दिया जाएगा...</strong>
         </div>
     </div>
 
     <script>
-        // Store tokens in localStorage and redirect
+        // Store tokens and redirect
         const accessToken = "{{ access_token }}";
         const refreshToken = "{{ refresh_token }}";
         const frontendUrl = "{{ frontend_url }}";
         
         function redirectToApp() {
-            // Store tokens
-            localStorage.setItem('access_token', accessToken);
-            localStorage.setItem('refresh_token', refreshToken);
-            
             // Redirect to frontend with tokens
             window.location.href = `${frontendUrl}/dashboard?access_token=${accessToken}&refresh_token=${refreshToken}`;
         }

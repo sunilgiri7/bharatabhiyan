@@ -8,6 +8,7 @@ urlpatterns = [
     path('auth/me', views.me, name='me'),
     
     # Payment endpoints
-    path('payments/registration/create-checkout', views.create_registration_payment_checkout, name='create_checkout'),
-    path('payments/webhook', views.stripe_webhook, name='stripe_webhook'),
+    path('payments/registration/create-order', views.create_razorpay_order, name='create_order'),
+    path('payments/registration/verify', views.verify_payment, name='verify_payment'),
+    path('payments/registration/callback', views.payment_callback, name='payment_callback'),
 ]

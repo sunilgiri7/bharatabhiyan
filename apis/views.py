@@ -14,12 +14,14 @@ from .serializers import (
     RegistrationPaymentSerializer
 )
 from accounts.models import RegistrationPayment
-import stripe
+import razorpay
+import hmac
+import hashlib
 
 User = get_user_model()
 
-# Initialize Stripe
-stripe.api_key = settings.STRIPE_SECRET_KEY
+# Initialize Razorpay Client
+razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 
 
 def get_tokens_for_user(user):
@@ -112,6 +114,11 @@ def login(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
+    """
+    Get current user details
+    GET /api/auth/me
+    Headers: Authorization: Bearer <access_token>
+    """
     user = request.user
     serializer = UserSerializer(user)
     
@@ -123,7 +130,7 @@ def me(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def create_registration_payment_checkout(request):
+def create_razorpay_order(request):
     user_id = request.data.get('user_id')
     
     if not user_id:
@@ -152,44 +159,35 @@ def create_registration_payment_checkout(request):
         status='PENDING'
     ).first()
     
-    if existing_payment and existing_payment.gateway_order_id:
-        # Return existing checkout URL if still valid
+    if existing_payment and existing_payment.gateway_ref:
+        # Return existing order
         return Response({
             'success': True,
-            'message': 'Payment session already exists',
-            'checkout_url': existing_payment.gateway_order_id,
-            'payment_id': existing_payment.id
+            'message': 'Payment order already exists',
+            'order_id': existing_payment.gateway_ref,
+            'amount': int(existing_payment.amount * 100),  # Convert to paise
+            'currency': 'INR',
+            'razorpay_key': settings.RAZORPAY_KEY_ID,
+            'user_name': user.name,
+            'user_email': user.email or '',
+            'user_phone': user.phone
         }, status=status.HTTP_200_OK)
     
     try:
-        # Create Stripe Checkout Session
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'inr',
-                    'unit_amount': 10000,  # ₹100 in paise
-                    'product_data': {
-                        'name': 'BharatAbhiyan Registration Fee',
-                        'description': 'One-time registration fee to activate your account',
-                    },
-                },
-                'quantity': 1,
-            }],
-            mode='payment',
-            success_url=f'{settings.PAYMENT_SUCCESS_URL}?session_id={{CHECKOUT_SESSION_ID}}',
-            cancel_url=f'{settings.PAYMENT_FAILURE_URL}?user_id={user_id}',
-            client_reference_id=str(user_id),
-            metadata={
-                'user_id': user_id,
+        # Create Razorpay Order
+        razorpay_order = razorpay_client.order.create({
+            'amount': 10000,  # ₹100 in paise
+            'currency': 'INR',
+            'payment_capture': 1,
+            'notes': {
+                'user_id': str(user_id),
                 'payment_type': 'registration'
             }
-        )
+        })
         
         # Create or update payment record
         if existing_payment:
-            existing_payment.gateway_order_id = checkout_session.url
-            existing_payment.gateway_ref = checkout_session.id
+            existing_payment.gateway_ref = razorpay_order['id']
             existing_payment.save()
             payment = existing_payment
         else:
@@ -197,18 +195,24 @@ def create_registration_payment_checkout(request):
                 user=user,
                 amount=100.00,
                 status='PENDING',
-                gateway_order_id=checkout_session.url,
-                gateway_ref=checkout_session.id
+                gateway_ref=razorpay_order['id']
             )
         
         return Response({
             'success': True,
-            'message': 'Checkout session created',
-            'checkout_url': checkout_session.url,
+            'message': 'Order created successfully',
+            'order_id': razorpay_order['id'],
+            'amount': razorpay_order['amount'],
+            'currency': razorpay_order['currency'],
+            'razorpay_key': settings.RAZORPAY_KEY_ID,
+            'user_name': user.name,
+            'user_email': user.email or '',
+            'user_phone': user.phone,
+            'callback_url': f"{settings.BASE_URL}/api/payments/registration/callback",
             'payment_id': payment.id
         }, status=status.HTTP_201_CREATED)
         
-    except stripe.error.StripeError as e:
+    except Exception as e:
         return Response({
             'success': False,
             'message': f'Payment error: {str(e)}'
@@ -216,141 +220,140 @@ def create_registration_payment_checkout(request):
 
 
 @csrf_exempt
-def payment_success(request):
-    """
-    Handle successful payment redirect from Stripe
-    GET /payment/success?session_id=xxx
-    """
-    session_id = request.GET.get('session_id')
-    
-    if not session_id:
-        return render(request, 'payment_error.html', {
-            'error_message': 'Invalid payment session'
-        })
-    
-    try:
-        # Retrieve the session from Stripe
-        session = stripe.checkout.Session.retrieve(session_id)
-        
-        if session.payment_status == 'paid':
-            user_id = session.client_reference_id or session.metadata.get('user_id')
-            
-            # Find user and payment record
-            user = User.objects.get(id=user_id)
-            payment = RegistrationPayment.objects.filter(
-                user=user,
-                gateway_ref=session_id
-            ).first()
-            
-            if not payment:
-                # Try to find by session id in gateway_ref
-                payment = RegistrationPayment.objects.filter(
-                    user=user,
-                    status='PENDING'
-                ).first()
-            
-            if payment:
-                # Update payment status
-                payment.status = 'SUCCESS'
-                payment.gateway_ref = session_id
-                payment.save()
-            
-            # Activate user account
-            if not user.is_active:
-                user.is_active = True
-                user.save()
-            
-            # Generate tokens for the user
-            tokens = get_tokens_for_user(user)
-            
-            return render(request, 'payment_success.html', {
-                'user': user,
-                'access_token': tokens['access'],
-                'refresh_token': tokens['refresh'],
-                'frontend_url': settings.FRONTEND_URL
-            })
-        else:
-            return render(request, 'payment_error.html', {
-                'error_message': 'Payment not completed'
-            })
-            
-    except stripe.error.StripeError as e:
-        return render(request, 'payment_error.html', {
-            'error_message': f'Payment verification failed: {str(e)}'
-        })
-    except User.DoesNotExist:
-        return render(request, 'payment_error.html', {
-            'error_message': 'User not found'
-        })
-    except Exception as e:
-        return render(request, 'payment_error.html', {
-            'error_message': f'An error occurred: {str(e)}'
-        })
-
-
-@csrf_exempt
-def payment_failure(request):
-    """
-    Handle failed/cancelled payment redirect from Stripe
-    GET /payment/failure?user_id=xxx
-    """
-    user_id = request.GET.get('user_id')
-    
-    context = {
-        'frontend_url': settings.FRONTEND_URL,
-        'user_id': user_id
-    }
-    
-    return render(request, 'payment_failure.html', context)
-
-
-@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def stripe_webhook(request):
-    """
-    Handle Stripe webhook events (optional but recommended)
-    POST /api/payments/webhook
-    """
-    payload = request.body
-    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+def verify_payment(request):
+    razorpay_order_id = request.data.get('razorpay_order_id')
+    razorpay_payment_id = request.data.get('razorpay_payment_id')
+    razorpay_signature = request.data.get('razorpay_signature')
+    user_id = request.data.get('user_id')
+    
+    if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature, user_id]):
+        return Response({
+            'success': False,
+            'message': 'Missing required payment details'
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except ValueError:
-        return Response({'error': 'Invalid payload'}, status=400)
-    except stripe.error.SignatureVerificationError:
-        return Response({'error': 'Invalid signature'}, status=400)
-    
-    # Handle the checkout.session.completed event
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
+        # Verify signature
+        generated_signature = hmac.new(
+            settings.RAZORPAY_KEY_SECRET.encode(),
+            f"{razorpay_order_id}|{razorpay_payment_id}".encode(),
+            hashlib.sha256
+        ).hexdigest()
         
-        if session.payment_status == 'paid':
-            user_id = session.client_reference_id or session.metadata.get('user_id')
+        if generated_signature != razorpay_signature:
+            return Response({
+                'success': False,
+                'message': 'Invalid payment signature'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get user and payment
+        user = User.objects.get(id=user_id)
+        payment = RegistrationPayment.objects.filter(
+            user=user,
+            gateway_ref=razorpay_order_id,
+            status='PENDING'
+        ).first()
+        
+        if not payment:
+            payment = RegistrationPayment.objects.filter(
+                user=user,
+                status='PENDING'
+            ).first()
+        
+        if payment:
+            # Update payment status
+            payment.status = 'SUCCESS'
+            payment.gateway_order_id = razorpay_payment_id
+            payment.save()
+        
+        # Activate user account
+        if not user.is_active:
+            user.is_active = True
+            user.save()
+        
+        # Generate tokens
+        tokens = get_tokens_for_user(user)
+        user_data = UserSerializer(user).data
+        
+        return Response({
+            'success': True,
+            'message': 'Payment verified and account activated successfully',
+            'user': user_data,
+            'tokens': tokens
+        }, status=status.HTTP_200_OK)
+        
+    except User.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'User not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Verification error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@csrf_exempt
+def payment_callback(request):
+    """
+    Handle Razorpay payment callback (for hosted checkout method)
+    POST /api/payments/registration/callback
+    """
+    if request.method == 'POST':
+        razorpay_order_id = request.POST.get('razorpay_order_id')
+        razorpay_payment_id = request.POST.get('razorpay_payment_id')
+        razorpay_signature = request.POST.get('razorpay_signature')
+        
+        try:
+            # Verify signature
+            generated_signature = hmac.new(
+                settings.RAZORPAY_KEY_SECRET.encode(),
+                f"{razorpay_order_id}|{razorpay_payment_id}".encode(),
+                hashlib.sha256
+            ).hexdigest()
             
-            try:
-                user = User.objects.get(id=user_id)
-                
-                # Update payment
+            if generated_signature == razorpay_signature:
+                # Payment successful - find user from order
                 payment = RegistrationPayment.objects.filter(
-                    user=user,
+                    gateway_ref=razorpay_order_id,
                     status='PENDING'
                 ).first()
                 
                 if payment:
-                    payment.status = 'SUCCESS'
-                    payment.gateway_ref = session.id
-                    payment.save()
-                
-                # Activate user
-                if not user.is_active:
-                    user.is_active = True
-                    user.save()
+                    user = payment.user
                     
-            except User.DoesNotExist:
-                pass
+                    # Update payment
+                    payment.status = 'SUCCESS'
+                    payment.gateway_order_id = razorpay_payment_id
+                    payment.save()
+                    
+                    # Activate user
+                    if not user.is_active:
+                        user.is_active = True
+                        user.save()
+                    
+                    # Generate tokens
+                    tokens = get_tokens_for_user(user)
+                    
+                    return render(request, 'payment_success.html', {
+                        'user': user,
+                        'access_token': tokens['access'],
+                        'refresh_token': tokens['refresh'],
+                        'frontend_url': settings.FRONTEND_URL
+                    })
+            
+            return render(request, 'payment_error.html', {
+                'error_message': 'Payment verification failed'
+            })
+            
+        except Exception as e:
+            return render(request, 'payment_error.html', {
+                'error_message': f'Error: {str(e)}'
+            })
     
-    return Response({'status': 'success'}, status=200)
+    return render(request, 'payment_error.html', {
+        'error_message': 'Invalid request method'
+    })
