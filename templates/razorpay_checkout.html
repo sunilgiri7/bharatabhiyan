@@ -53,6 +53,18 @@
             font-size: 14px;
             margin-bottom: 30px;
         }
+        .user-info {
+            background: #f3f4f6;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        .user-info p {
+            margin: 5px 0;
+            color: #374151;
+            font-size: 13px;
+        }
         .payment-methods {
             background: #f3f4f6;
             border-radius: 10px;
@@ -90,10 +102,16 @@
             color: white;
             width: 100%;
             transition: transform 0.2s;
+            cursor: pointer;
         }
         .btn-pay:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-pay:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         .secure-badge {
             margin-top: 20px;
@@ -118,12 +136,20 @@
 <body>
     <div class="payment-card">
         <div class="logo">BA</div>
-        <h1>Complete Your Payment</h1>
+        <h1>पेमेंट पूरी करें</h1>
         <div class="amount">₹100</div>
-        <p class="description">One-time registration fee to activate your BharatAbhiyan account</p>
+        <p class="description">BharatAbhiyan अकाउंट एक्टिवेट करने के लिए एक बार का रजिस्ट्रेशन शुल्क</p>
+        
+        <div class="user-info">
+            <p><strong>नाम:</strong> {{ user_name }}</p>
+            <p><strong>फोन:</strong> {{ user_phone }}</p>
+            {% if user_email %}
+            <p><strong>ईमेल:</strong> {{ user_email }}</p>
+            {% endif %}
+        </div>
         
         <div class="payment-methods">
-            <h5>Accepted Payment Methods</h5>
+            <h5>स्वीकृत पेमेंट विधियां</h5>
             <div class="method-icons">
                 <span class="method-icon">🏦 UPI</span>
                 <span class="method-icon">💳 Cards</span>
@@ -132,15 +158,15 @@
             </div>
         </div>
         
-        <button id="payButton" class="btn btn-pay">
-            Pay ₹100 Securely
+        <button id="payButton" class="btn-pay">
+            ₹100 का सुरक्षित भुगतान करें
         </button>
         
         <div class="loading">
             <div class="spinner-border" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="mt-2" style="color: #6b7280;">Processing payment...</p>
+            <p class="mt-2" style="color: #6b7280;">पेमेंट प्रोसेस हो रहा है...</p>
         </div>
         
         <div class="secure-badge">
@@ -153,16 +179,53 @@
 
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script>
-        // This page is used if you want to show a custom payment page
-        // Otherwise, you can directly trigger Razorpay from React frontend
+        const payButton = document.getElementById('payButton');
+        const loadingDiv = document.querySelector('.loading');
         
-        document.getElementById('payButton').addEventListener('click', function() {
-            // Show loading
-            document.querySelector('.loading').style.display = 'block';
-            document.getElementById('payButton').disabled = true;
+        const options = {
+            key: "{{ razorpay_key }}",
+            amount: "{{ amount }}",
+            currency: "{{ currency }}",
+            name: "BharatAbhiyan",
+            description: "Registration Fee - ₹100",
+            order_id: "{{ order_id }}",
+            callback_url: "{{ callback_url }}",
+            prefill: {
+                name: "{{ user_name }}",
+                email: "{{ user_email }}",
+                contact: "{{ user_phone }}"
+            },
+            theme: {
+                color: "#667eea"
+            },
+            modal: {
+                ondismiss: function() {
+                    payButton.disabled = false;
+                    loadingDiv.style.display = 'none';
+                }
+            }
+        };
+        
+        payButton.addEventListener('click', function() {
+            payButton.disabled = true;
+            loadingDiv.style.display = 'block';
             
-            // Get order details from backend (implement this in your flow)
-            alert('This is a template. Integrate with your backend to get order details.');
+            const rzp = new Razorpay(options);
+            
+            rzp.on('payment.failed', function (response) {
+                payButton.disabled = false;
+                loadingDiv.style.display = 'none';
+                alert('Payment failed: ' + response.error.description);
+            });
+            
+            rzp.open();
+        });
+        
+        // Auto-trigger payment on page load
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                payButton.click();
+            }, 500);
         });
     </script>
 </body>

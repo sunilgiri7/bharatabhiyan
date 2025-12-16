@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'accounts',
     'locations',
     'apis',
+    'providers',
 ]
 
 MIDDLEWARE = [
@@ -100,6 +101,8 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -127,12 +130,13 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# Razorpay Configuration (Get from https://dashboard.razorpay.com)
-RAZORPAY_KEY_ID = 'rzp_test_your_key_id_here'
-RAZORPAY_KEY_SECRET = 'your_key_secret_here'
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+ALLOWED_DOCUMENT_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.pdf']
+ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png']
 
-# Frontend URLs for redirect
-FRONTEND_URL = 'http://localhost:3000'  # Your React app URL
-
-# Base URL for callback
+# Razorpay Configuration
+RAZORPAY_KEY_ID = 'rzp_test_RsMUCPaNqavQwg'
+RAZORPAY_KEY_SECRET = 'z5md380Rb4tzCG8YyAJ6CMi7'
+FRONTEND_URL = 'http://localhost:3000'
 BASE_URL = 'http://0.0.0.0:8080'
