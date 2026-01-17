@@ -66,7 +66,7 @@ def login(request):
     """
     Login user
     POST /api/auth/login
-    Body: {phone, password}
+    Body: {phone/email, password}
     Returns: JWT tokens + user data
     """
     serializer = UserLoginSerializer(data=request.data)
@@ -77,16 +77,17 @@ def login(request):
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    phone = serializer.validated_data['phone']
+    phone = serializer.validated_data.get('phone', '').strip() if serializer.validated_data.get('phone') else None
+    email = serializer.validated_data.get('email', '').strip() if serializer.validated_data.get('email') else None
     password = serializer.validated_data['password']
     
-    # Authenticate user
-    user = authenticate(request, phone=phone, password=password)
+    # Authenticate user with phone or email
+    user = authenticate(request, phone=phone, email=email, password=password)
     
     if user is None:
         return Response({
             'success': False,
-            'message': 'Invalid phone number or password'
+            'message': 'Invalid credentials'
         }, status=status.HTTP_401_UNAUTHORIZED)
     
     # Check if account is active (paid)
