@@ -7,23 +7,45 @@ User = get_user_model()
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
+    phone = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
     
     class Meta:
         model = User
         fields = ['phone', 'email', 'name', 'password']
     
+    def validate(self, data):
+        phone = data.get('phone', '').strip() if data.get('phone') else ''
+        email = data.get('email', '').strip() if data.get('email') else ''
+        
+        if not phone and not email:
+            raise serializers.ValidationError("Either phone number or email is required")
+        
+        return data
+    
     def validate_phone(self, value):
-        if User.objects.filter(phone=value).exists():
-            raise serializers.ValidationError("Phone number already registered")
+        if value:
+            value = value.strip()
+            if User.objects.filter(phone=value).exists():
+                raise serializers.ValidationError("Phone number already registered")
         return value
     
     def validate_email(self, value):
-        if value and User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already registered")
+        if value:
+            value = value.strip()
+            if User.objects.filter(email=value).exists():
+                raise serializers.ValidationError("Email already registered")
         return value
     
     def create(self, validated_data):
         password = validated_data.pop('password', None)
+        # Clean up empty strings to None
+        phone = validated_data.get('phone')
+        email = validated_data.get('email')
+        
+        validated_data['phone'] = phone.strip() if phone else None
+        validated_data['email'] = email.strip() if email else None
+        
         user = User.objects.create(**validated_data)
         
         if password:
@@ -37,8 +59,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    phone = serializers.CharField()
+    phone = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True)
+    
+    def validate(self, data):
+        phone = data.get('phone', '').strip() if data.get('phone') else ''
+        email = data.get('email', '').strip() if data.get('email') else ''
+        
+        if not phone and not email:
+            raise serializers.ValidationError("Either phone number or email is required")
+        
+        return data
 
 
 class UserSerializer(serializers.ModelSerializer):

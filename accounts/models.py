@@ -4,11 +4,11 @@ from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, phone, password=None, **extra_fields):
-        if not phone:
-            raise ValueError('Phone number is required')
+    def create_user(self, phone=None, email=None, password=None, **extra_fields):
+        if not phone and not email:
+            raise ValueError('Either phone number or email is required')
         
-        user = self.model(phone=phone, **extra_fields)
+        user = self.model(phone=phone, email=email, **extra_fields)
         if password:
             user.set_password(password)
         user.save(using=self._db)
@@ -24,7 +24,7 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    phone = models.CharField(max_length=15, unique=True)
+    phone = models.CharField(max_length=15, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     name = models.CharField(max_length=255)
     
@@ -42,6 +42,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     
     USERNAME_FIELD = 'phone'
     REQUIRED_FIELDS = ['name']
+    
+    def clean(self):
+        if not self.phone and not self.email:
+            raise ValueError('Either phone number or email is required')
     
     class Meta:
         db_table = 'users'
