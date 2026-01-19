@@ -138,5 +138,5 @@ ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png']
 # Razorpay Configuration
 RAZORPAY_KEY_ID = 'rzp_test_RsMUCPaNqavQwg'
 RAZORPAY_KEY_SECRET = 'z5md380Rb4tzCG8YyAJ6CMi7'
-FRONTEND_URL = 'http://localhost:3000'
-BASE_URL = 'http://0.0.0.0:8080'
+FRONTEND_URL = 'http://localhost:8080'
+BASE_URL = 'http://localhost:8000'

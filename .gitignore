@@ -1,3 +1,117 @@
+# Virtual Environment
 env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Environment variables
 .env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/media/
+/static/
+staticfiles/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.atom/
+.vscode-server/
+
+# OS specific
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Development files
+.editorconfig
+.pre-commit-config.yaml
 apis/utils/extra.txt
+
+# IDE specific
+*.code-workspace
+.history/
+
+# Logs
+logs/
+*.log
+
+# Database backups
+*.backup
+*.sql
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if using any frontend build tools)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Poetry
+poetry.lock
+pyproject.toml.backup
+
+# Pipenv
+Pipfile.lock
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Celery
+celerybeat-schedule
+
+# Documentation
+site/
+docs/_build/
+
+# Testing
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Backup files
+*.bak
+*.orig
