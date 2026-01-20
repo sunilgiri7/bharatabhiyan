@@ -16,6 +16,7 @@ from .serializers import (
 from accounts.models import RegistrationPayment
 import razorpay
 import hmac
+from .services.gemini_service import GeminiAIService
 import hashlib
 
 User = get_user_model()
@@ -35,12 +36,6 @@ def get_tokens_for_user(user):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
-    """
-    Register new user
-    POST /api/auth/register
-    Body: {phone, email, name, password}
-    Returns: user data with is_active=False (needs payment)
-    """
     serializer = UserRegistrationSerializer(data=request.data)
     
     if serializer.is_valid():
@@ -343,3 +338,65 @@ def check_payment_status(request, payment_id):
             'success': False,
             'message': 'Payment not found'
         }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_ai_guide(request):
+    question = request.data.get('question', '').strip()
+    language = request.data.get('language', 'english').strip().lower()
+    
+    # Validation
+    if not question:
+        return Response({
+            'success': False,
+            'message': 'Question is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # if len(question) < 5:
+    #     return Response({
+    #         'success': False,
+    #         'message': 'Question is too short. Please provide more details.'
+    #     }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if len(question) > 500:
+        return Response({
+            'success': False,
+            'message': 'Question is too long. Please limit to 500 characters.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate language
+    supported_languages = ['english', 'hindi']
+    if language not in supported_languages:
+        return Response({
+            'success': False,
+            'message': f'Language not supported. Use: {", ".join(supported_languages)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get AI response
+    try:
+        ai_service = GeminiAIService()
+        result = ai_service.get_ai_guide(question, language)
+        
+        if not result['success']:
+            return Response({
+                'success': False,
+                'message': result.get('message', 'Failed to generate response'),
+                'error': result.get('error', '')
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response({
+            'success': True,
+            'data': {
+                'response': result['response'],
+                'language': result['language'],
+                'question': question
+            }
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': 'An error occurred while processing your request',
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

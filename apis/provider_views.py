@@ -12,7 +12,7 @@ import hmac
 import hashlib
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
-
+from django.db.models import Q
 from providers.models import (
     ServiceProvider, ServiceCategory, ServiceType,
     ServiceArea, ProviderSubscription
@@ -21,7 +21,7 @@ from .provider_serializers import (
     ServiceProviderCreateSerializer, ServiceProviderUpdateSerializer,
     ServiceProviderDetailSerializer, ServiceProviderSubmitSerializer,
     ServiceCategorySerializer, ServiceTypeSerializer, ServiceAreaSerializer,
-    ProviderSubscriptionSerializer, ProviderSubscriptionCreateSerializer
+    ProviderSubscriptionSerializer, ProviderSubscriptionCreateSerializer, ServiceProviderListSerializer
 )
 
 # Initialize Razorpay client
@@ -85,6 +85,118 @@ def get_service_areas(request):
     return Response({
         'success': True,
         'data': serializer.data
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_services(request):
+    category_ids = request.query_params.get('categories', '').strip()
+    service_type_ids = request.query_params.get('service_types', '').strip()
+    
+    if not category_ids:
+        return Response({
+            'success': False,
+            'message': 'categories parameter is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        category_list = [int(id.strip()) for id in category_ids.split(',') if id.strip()]
+    except ValueError:
+        return Response({
+            'success': False,
+            'message': 'Invalid category IDs format'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # If service_types are provided, return providers
+    if service_type_ids:
+        try:
+            service_type_list = [int(id.strip()) for id in service_type_ids.split(',') if id.strip()]
+        except ValueError:
+            return Response({
+                'success': False,
+                'message': 'Invalid service_types format'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        providers = ServiceProvider.objects.filter(
+            service_category_id__in=category_list,
+            service_type_id__in=service_type_list,
+            verification_status='VERIFIED'
+        ).select_related(
+            'user', 'city', 'service_category', 'service_type'
+        ).prefetch_related('service_areas')
+        
+        serializer = ServiceProviderListSerializer(providers, many=True)
+        return Response({
+            'success': True,
+            'data': {
+                'providers': serializer.data,
+                'count': providers.count()
+            }
+        })
+    
+    # Only categories provided, return service types
+    service_types = ServiceType.objects.filter(
+        category_id__in=category_list,
+        is_active=True
+    ).select_related('category')
+    
+    serializer = ServiceTypeSerializer(service_types, many=True)
+    return Response({
+        'success': True,
+        'data': {
+            'service_types': serializer.data,
+            'count': service_types.count()
+        }
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_providers_by_area(request):
+    service_type_ids = request.query_params.get('service_types', '').strip()
+    service_area_ids = request.query_params.get('service_areas', '').strip()
+    
+    if not service_type_ids and not service_area_ids:
+        return Response({
+            'success': False,
+            'message': 'At least one of service_types or service_areas is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    filters = Q(verification_status='VERIFIED')
+    
+    # Add service_types filter
+    if service_type_ids:
+        try:
+            service_type_list = [int(id.strip()) for id in service_type_ids.split(',') if id.strip()]
+            filters &= Q(service_type_id__in=service_type_list)
+        except ValueError:
+            return Response({
+                'success': False,
+                'message': 'Invalid service_types format'
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if service_area_ids:
+        try:
+            service_area_list = [int(id.strip()) for id in service_area_ids.split(',') if id.strip()]
+            filters &= Q(service_areas__id__in=service_area_list)
+        except ValueError:
+            return Response({
+                'success': False,
+                'message': 'Invalid service_areas format'
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    providers = ServiceProvider.objects.filter(filters).distinct().select_related(
+        'user', 'city', 'service_category', 'service_type'
+    ).prefetch_related('service_areas')
+    
+    serializer = ServiceProviderListSerializer(providers, many=True)
+    
+    return Response({
+        'success': True,
+        'data': {
+            'providers': serializer.data,
+            'count': providers.count()
+        }
     })
 
 

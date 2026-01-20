@@ -17,6 +17,8 @@ urlpatterns = [
     path('providers/categories', provider_views.get_service_categories, name='get_service_categories'),
     path('providers/service-types', provider_views.get_service_types, name='get_service_types'),
     path('providers/service-areas', provider_views.get_service_areas, name='get_service_areas'),
+    path('services/', provider_views.get_services, name='get-services'),
+    path('providers/by-area/', provider_views.get_providers_by_area, name='providers-by-area'),
     
     # Provider Registration APIs
     path('providers/profile', provider_views.create_provider_profile, name='create_provider_profile'),
@@ -29,4 +31,6 @@ urlpatterns = [
     path('providers/subscription/callback', provider_views.subscription_payment_callback, name='subscription_payment_callback'),
     path('providers/subscription/status/<int:subscription_id>', provider_views.check_subscription_status, name='check_subscription_status'),
     path('providers/subscription/active', provider_views.get_active_subscription, name='get_active_subscription'),
+
+    path('ai/guide/', views.get_ai_guide, name='ai-guide'),
 ]

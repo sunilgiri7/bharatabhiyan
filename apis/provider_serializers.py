@@ -231,3 +231,56 @@ class ProviderSubscriptionCreateSerializer(serializers.Serializer):
             })
         
         return data
+
+class ServiceProviderListSerializer(serializers.ModelSerializer):
+    """Serializer for listing providers with essential details"""
+    
+    user_name = serializers.CharField(source='user.name', read_only=True)
+    user_phone = serializers.CharField(source='user.phone', read_only=True)
+    whatsapp = serializers.CharField(source='whatsapp_number', read_only=True)
+    
+    city_name = serializers.CharField(source='city.name', read_only=True)
+    state_name = serializers.CharField(source='city.state', read_only=True)
+    
+    category_id = serializers.IntegerField(source='service_category.id', read_only=True)
+    category_name = serializers.CharField(source='service_category.name', read_only=True)
+    
+    service_type_id = serializers.IntegerField(source='service_type.id', read_only=True)
+    service_type_name = serializers.CharField(source='service_type.name', read_only=True)
+    
+    service_areas_list = ServiceAreaSerializer(source='service_areas', many=True, read_only=True)
+    
+    profile_photo_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ServiceProvider
+        fields = [
+            'id',
+            'application_id',
+            'user_name',
+            'user_phone',
+            'whatsapp',
+            'business_name',
+            'experience',
+            'business_address',
+            'city_name',
+            'state_name',
+            'pincode',
+            'category_id',
+            'category_name',
+            'service_type_id',
+            'service_type_name',
+            'service_description',
+            'service_areas_list',
+            'profile_photo_url',
+            'verification_status',
+            'verification_date',
+        ]
+    
+    def get_profile_photo_url(self, obj):
+        if obj.profile_photo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_photo.url)
+            return obj.profile_photo.url
+        return None

@@ -1,5 +1,7 @@
 from pathlib import Path
 from datetime import timedelta
+import os
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wju_67_wl244=&xwbg#9rbox%%^+8k5nsuz$b48fk7&nexvh!3'
 DEBUG = True
@@ -140,3 +142,5 @@ RAZORPAY_KEY_ID = 'rzp_test_RsMUCPaNqavQwg'
 RAZORPAY_KEY_SECRET = 'z5md380Rb4tzCG8YyAJ6CMi7'
 FRONTEND_URL = 'http://localhost:8080'
 BASE_URL = 'http://localhost:8000'
+
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')

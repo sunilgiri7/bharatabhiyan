@@ -33,7 +33,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_captain = models.BooleanField(default=False)
     
     # Status flags
-    is_active = models.BooleanField(default=False)  # Activated after ₹100 payment
+    is_active = models.BooleanField(default=True)  
     is_staff = models.BooleanField(default=False)
     
     date_joined = models.DateTimeField(default=timezone.now)
