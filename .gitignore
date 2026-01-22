@@ -81,6 +81,7 @@ logs/
 tmp/
 temp/
 *.tmp
+.env
 
 # Node modules (if using any frontend build tools)
 node_modules/

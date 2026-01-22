@@ -1,13 +1,13 @@
-# services/gemini_service.py
-
-import google.generativeai as genai
+from google import genai
 from django.conf import settings
 
 
 class GeminiAIService:
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.client = genai.Client(
+            api_key=settings.GEMINI_API_KEY
+        )
+        self.model = "gemini-2.0-flash"
     
     def get_prompt_template(self, language='english'):
         """Get domain-specific prompt template based on language"""
