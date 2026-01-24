@@ -15,12 +15,16 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, phone, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_active', True)
-        extra_fields.setdefault('is_admin', True)
-        
-        return self.create_user(phone, password, **extra_fields)
+        extra_fields['is_staff'] = True
+        extra_fields['is_superuser'] = True
+        extra_fields['is_active'] = True
+        extra_fields['is_admin'] = True
+
+        return self.create_user(
+            phone=phone,
+            password=password,
+            **extra_fields
+        )
 
 
 class User(AbstractBaseUser, PermissionsMixin):

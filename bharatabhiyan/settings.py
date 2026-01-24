@@ -1,12 +1,33 @@
 from pathlib import Path
 from datetime import timedelta
 import os
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wju_67_wl244=&xwbg#9rbox%%^+8k5nsuz$b48fk7&nexvh!3'
 DEBUG = True
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+"bharatabhiyan.onrender.com",
+"bharatabhiyan-frontend.vercel.app",
+"localhost",
+"127.0.0.1",
+]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+"https://bharatabhiyan-frontend.vercel.app",
+]
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+CSRF_TRUSTED_ORIGINS = [
+"https://bharatabhiyan-frontend.vercel.app",
+]
 
 # Application definition
 INSTALLED_APPS = [
