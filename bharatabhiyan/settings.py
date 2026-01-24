@@ -13,6 +13,11 @@ ALLOWED_HOSTS = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
 "https://bharatabhiyan-frontend.vercel.app",
+
+# local frontend dev
+"http://localhost:3000",
+"http://localhost:5173",
+"http://localhost:8080",
 ]
 CORS_ALLOW_HEADERS = [
     "accept",
