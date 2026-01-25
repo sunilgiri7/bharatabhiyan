@@ -178,13 +178,38 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
             'profile_photo', 'skill_certificate',
             'verification_status', 'verified_by', 'verified_by_name', 'verified_by_id',
             'verification_date', 'rejection_reason',
-            'submitted_at', 'created_at', 'updated_at'
+            'submitted_at', 'created_at', 'updated_at',
+            'has_active_subscription',
+            'active_plan',
+            'subscription_end_date',
         ]
         read_only_fields = [
             'id', 'application_id', 'verification_status', 'verified_by',
             'verification_date', 'rejection_reason', 'submitted_at', 
             'created_at', 'updated_at'
         ]
+
+        def get_has_active_subscription(self, obj):
+            return obj.subscriptions.filter(
+            status='ACTIVE',
+            end_date__gte=timezone.now()
+            ).exists()
+
+
+        def get_active_plan(self, obj):
+            sub = obj.subscriptions.filter(
+            status='ACTIVE',
+            end_date__gte=timezone.now()
+            ).first()
+            return sub.plan_type if sub else None
+
+
+        def get_subscription_end_date(self, obj):
+            sub = obj.subscriptions.filter(
+            status='ACTIVE',
+            end_date__gte=timezone.now()
+            ).first()
+            return sub.end_date if sub else None
 
 
 class ProviderSubscriptionSerializer(serializers.ModelSerializer):
