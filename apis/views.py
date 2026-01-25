@@ -58,12 +58,6 @@ def register(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
-    """
-    Login user
-    POST /api/auth/login
-    Body: {phone/email, password}
-    Returns: JWT tokens + user data
-    """
     serializer = UserLoginSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -142,11 +136,11 @@ def create_payment_link(request):
             'message': 'User not found'
         }, status=status.HTTP_404_NOT_FOUND)
     
-    if user.is_active:
-        return Response({
-            'success': False,
-            'message': 'User account already activated'
-        }, status=status.HTTP_400_BAD_REQUEST)
+    # if user.is_active:
+    #     return Response({
+    #         'success': False,
+    #         'message': 'User account already activated'
+    #     }, status=status.HTTP_400_BAD_REQUEST)
     
     # Check if pending payment exists
     existing_payment = RegistrationPayment.objects.filter(
@@ -212,11 +206,11 @@ def payment_checkout(request, payment_id):
         payment = RegistrationPayment.objects.get(id=payment_id, status='PENDING')
         user = payment.user
         
-        if user.is_active:
-            return render(request, 'payment_error.html', {
-                'error_message': 'User account already activated',
-                'frontend_url': settings.FRONTEND_URL
-            })
+        # if user.is_active:
+        #     return render(request, 'payment_error.html', {
+        #         'error_message': 'User account already activated',
+        #         'frontend_url': settings.FRONTEND_URL
+        #     })
         
         context = {
             'razorpay_key': settings.RAZORPAY_KEY_ID,
