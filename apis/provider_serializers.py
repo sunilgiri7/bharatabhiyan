@@ -153,7 +153,6 @@ class ServiceProviderSubmitSerializer(serializers.Serializer):
             raise serializers.ValidationError("All declarations must be accepted")
         return data
 
-
 class ServiceProviderDetailSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.name', read_only=True)
     user_phone = serializers.CharField(source='user.phone', read_only=True)
@@ -165,7 +164,11 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
     service_areas_list = ServiceAreaSerializer(source='service_areas', many=True, read_only=True)
     verified_by_name = serializers.CharField(source='verified_by.name', read_only=True)
     verified_by_id = serializers.CharField(source='verified_by.id', read_only=True)
-    
+
+    has_active_subscription = serializers.SerializerMethodField()
+    active_plan = serializers.SerializerMethodField()
+    subscription_end_date = serializers.SerializerMethodField()
+
     class Meta:
         model = ServiceProvider
         fields = [
@@ -174,42 +177,45 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
             'business_address', 'city', 'city_name', 'state_name', 'pincode',
             'service_category', 'category_name', 'service_type', 'service_type_name',
             'service_description', 'service_areas_list',
+
+            'has_active_subscription',
+            'active_plan',
+            'subscription_end_date',
+
             'aadhaar_front', 'aadhaar_back', 'address_proof_type', 'address_proof',
             'profile_photo', 'skill_certificate',
             'verification_status', 'verified_by', 'verified_by_name', 'verified_by_id',
             'verification_date', 'rejection_reason',
             'submitted_at', 'created_at', 'updated_at',
-            'has_active_subscription',
-            'active_plan',
-            'subscription_end_date',
         ]
+
         read_only_fields = [
             'id', 'application_id', 'verification_status', 'verified_by',
-            'verification_date', 'rejection_reason', 'submitted_at', 
+            'verification_date', 'rejection_reason', 'submitted_at',
             'created_at', 'updated_at'
         ]
 
-        def get_has_active_subscription(self, obj):
-            return obj.subscriptions.filter(
+    # 🧠 Business logic lives here — not in Meta
+
+    def get_has_active_subscription(self, obj):
+        return obj.subscriptions.filter(
             status='ACTIVE',
             end_date__gte=timezone.now()
-            ).exists()
+        ).exists()
 
-
-        def get_active_plan(self, obj):
-            sub = obj.subscriptions.filter(
+    def get_active_plan(self, obj):
+        sub = obj.subscriptions.filter(
             status='ACTIVE',
             end_date__gte=timezone.now()
-            ).first()
-            return sub.plan_type if sub else None
+        ).first()
+        return sub.plan_type if sub else None
 
-
-        def get_subscription_end_date(self, obj):
-            sub = obj.subscriptions.filter(
+    def get_subscription_end_date(self, obj):
+        sub = obj.subscriptions.filter(
             status='ACTIVE',
             end_date__gte=timezone.now()
-            ).first()
-            return sub.end_date if sub else None
+        ).first()
+        return sub.end_date if sub else None
 
 
 class ProviderSubscriptionSerializer(serializers.ModelSerializer):
