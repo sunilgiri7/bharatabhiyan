@@ -88,7 +88,7 @@ def get_service_areas(request):
     })
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_services(request):
     category_ids = request.query_params.get('categories', '').strip()
     service_type_ids = request.query_params.get('service_types', '').strip()

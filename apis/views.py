@@ -103,11 +103,6 @@ def login(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
-    """
-    Get current user details
-    GET /api/auth/me
-    Headers: Authorization: Bearer <access_token>
-    """
     user = request.user
     serializer = UserSerializer(user)
     
