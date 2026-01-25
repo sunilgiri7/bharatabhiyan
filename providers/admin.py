@@ -9,9 +9,17 @@ from .models import (
 
 @admin.register(ServiceCategory)
 class ServiceCategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'icon', 'is_active', 'created_at']
-    list_filter = ['is_active']
-    search_fields = ['name']
+    list_display = ['name', 'icon', 'short_description', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['name', 'description']
+    ordering = ['-created_at']
+    list_editable = ['is_active']
+
+
+    def short_description(self, obj):
+        return (obj.description[:60] + '...') if obj.description else '—'
+
+    short_description.short_description = "Description"
 
 
 @admin.register(ServiceType)

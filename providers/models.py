@@ -6,13 +6,16 @@ from locations.models import Location
 class ServiceCategory(models.Model):
     name = models.CharField(max_length=100)
     icon = models.CharField(max_length=50, help_text="Emoji or icon identifier")
+
+    description = models.TextField(blank=True, null=True)
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         db_table = 'service_categories'
         verbose_name_plural = 'Service Categories'
-    
+
     def __str__(self):
         return self.name
 
