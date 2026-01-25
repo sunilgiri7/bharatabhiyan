@@ -1,6 +1,6 @@
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
@@ -33,7 +33,7 @@ razorpay_client = razorpay.Client(
 # ===== Helper APIs for Dropdowns =====
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_service_categories(request):
     """Get all active service categories"""
     categories = ServiceCategory.objects.filter(is_active=True)
@@ -45,7 +45,7 @@ def get_service_categories(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_service_types(request):
     """Get service types, optionally filtered by category"""
     category_id = request.query_params.get('category_id')
@@ -66,7 +66,7 @@ def get_service_types(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_service_areas(request):
     """Get service areas for a specific location"""
     location_id = request.query_params.get('location_id')
@@ -151,7 +151,7 @@ def get_services(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_providers_by_area(request):
     service_type_ids = request.query_params.get('service_types', '').strip()
     service_area_ids = request.query_params.get('service_areas', '').strip()
