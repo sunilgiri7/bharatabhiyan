@@ -179,7 +179,7 @@ ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png']
 # Razorpay Configuration
 RAZORPAY_KEY_ID = 'rzp_test_RsMUCPaNqavQwg'
 RAZORPAY_KEY_SECRET = 'z5md380Rb4tzCG8YyAJ6CMi7'
-FRONTEND_URL = 'bharatabhiyan-frontend.vercel.app'
-BASE_URL = 'bharatabhiyan.onrender.com'
+FRONTEND_URL = 'https://bharatabhiyan-frontend.vercel.app'
+BASE_URL = 'https://bharatabhiyan.onrender.com'
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
