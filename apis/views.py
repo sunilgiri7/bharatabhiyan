@@ -137,7 +137,12 @@ def create_payment_link(request):
     #         'message': 'User account already activated'
     #     }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Check if pending payment exists
+    if RegistrationPayment.objects.filter(user=user, status='SUCCESS').exists():
+        return Response({
+        'success': False,
+        'message': 'Registration already completed. You are already subscribed.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     existing_payment = RegistrationPayment.objects.filter(
         user=user, 
         status='PENDING'
