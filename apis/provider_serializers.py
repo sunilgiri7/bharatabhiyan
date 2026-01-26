@@ -165,7 +165,7 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
     verified_by_name = serializers.CharField(source='verified_by.name', read_only=True)
     verified_by_id = serializers.CharField(source='verified_by.id', read_only=True)
 
-    subscription_status = serializers.SerializerMethodField()
+    registration_payment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceProvider
@@ -175,7 +175,7 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
             'business_address', 'city', 'city_name', 'state_name', 'pincode',
             'service_category', 'category_name', 'service_type', 'service_type_name',
             'service_description', 'service_areas_list',
-            'subscription_status',
+            'registration_payment_status',
             'aadhaar_front', 'aadhaar_back', 'address_proof_type', 'address_proof',
             'profile_photo', 'skill_certificate',
             'verification_status', 'verified_by', 'verified_by_name', 'verified_by_id',
@@ -189,13 +189,13 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
 
-    def get_subscription_status(self, obj):
-        sub = (
-            obj.subscriptions
+    def get_registration_payment_status(self, obj):
+        payment = (
+            obj.user.registration_payments
             .order_by('-created_at')
             .first()
         )
-        return sub.status if sub else None
+        return payment.status if payment else None
 
 
 class ProviderSubscriptionSerializer(serializers.ModelSerializer):

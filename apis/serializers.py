@@ -74,7 +74,7 @@ class UserLoginSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     is_provider = serializers.SerializerMethodField()
-    subscription_status = serializers.SerializerMethodField()
+    registration_payment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -82,7 +82,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'phone', 'email', 'name',
             'is_active', 'is_admin', 'is_captain', 'date_joined',
             'is_provider',
-            'subscription_status',
+            'registration_payment_status',
         ]
 
         read_only_fields = [
@@ -92,17 +92,13 @@ class UserSerializer(serializers.ModelSerializer):
     def get_is_provider(self, obj):
         return hasattr(obj, 'provider_profile')
 
-    def get_subscription_status(self, obj):
-        if not hasattr(obj, 'provider_profile'):
-            return None
-
-        sub = (
-            obj.provider_profile.subscriptions
+    def get_registration_payment_status(self, obj):
+        payment = (
+            obj.registration_payments
             .order_by('-created_at')
             .first()
         )
-
-        return sub.status if sub else None
+        return payment.status if payment else None
 
 
 class RegistrationPaymentSerializer(serializers.ModelSerializer):

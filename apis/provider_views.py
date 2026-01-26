@@ -1,3 +1,4 @@
+from accounts.models import User
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -276,20 +277,38 @@ def create_provider_profile(request):
         'errors': serializer.errors
     }, status=status.HTTP_400_BAD_REQUEST)
 
-
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def get_provider_profile(request):
-    """Get current user's provider profile"""
-    user = request.user
-    
+    if request.method == 'GET':
+        user = request.user
+
+    else:  # POST
+        user_id = request.data.get('user_id')
+
+        if not user_id:
+            return Response({
+                'success': False,
+                'message': 'user_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
     try:
         provider = user.provider_profile
         serializer = ServiceProviderDetailSerializer(provider)
+
         return Response({
             'success': True,
             'data': serializer.data
-        })
+        }, status=status.HTTP_200_OK)
+
     except ServiceProvider.DoesNotExist:
         return Response({
             'success': False,
