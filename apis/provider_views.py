@@ -196,8 +196,11 @@ def get_services_and_providers(request):
 
     filters = Q(verification_status='VERIFIED')
 
+    # if category_list:
+    #     filters &= Q(service_category_id__in=category_list)
     if category_list:
         filters &= Q(service_category_id__in=category_list)
+        filters &= Q(service_type__category_id__in=category_list)
 
     if service_type_list:
         filters &= Q(service_type_id__in=service_type_list)
