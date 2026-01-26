@@ -74,20 +74,15 @@ class UserLoginSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     is_provider = serializers.SerializerMethodField()
-    has_active_subscription = serializers.SerializerMethodField()
-    active_plan = serializers.SerializerMethodField()
-    subscription_end_date = serializers.SerializerMethodField()
+    subscription_status = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'phone', 'email', 'name',
             'is_active', 'is_admin', 'is_captain', 'date_joined',
-
             'is_provider',
-            'has_active_subscription',
-            'active_plan',
-            'subscription_end_date',
+            'subscription_status',
         ]
 
         read_only_fields = [
@@ -97,36 +92,17 @@ class UserSerializer(serializers.ModelSerializer):
     def get_is_provider(self, obj):
         return hasattr(obj, 'provider_profile')
 
-    def get_has_active_subscription(self, obj):
-        if not hasattr(obj, 'provider_profile'):
-            return False
-
-        return obj.provider_profile.subscriptions.filter(
-            status='ACTIVE',
-            end_date__gte=timezone.now()
-        ).exists()
-
-    def get_active_plan(self, obj):
+    def get_subscription_status(self, obj):
         if not hasattr(obj, 'provider_profile'):
             return None
 
-        sub = obj.provider_profile.subscriptions.filter(
-            status='ACTIVE',
-            end_date__gte=timezone.now()
-        ).first()
+        sub = (
+            obj.provider_profile.subscriptions
+            .order_by('-created_at')
+            .first()
+        )
 
-        return sub.plan_type if sub else None
-
-    def get_subscription_end_date(self, obj):
-        if not hasattr(obj, 'provider_profile'):
-            return None
-
-        sub = obj.provider_profile.subscriptions.filter(
-            status='ACTIVE',
-            end_date__gte=timezone.now()
-        ).first()
-
-        return sub.end_date if sub else None
+        return sub.status if sub else None
 
 
 class RegistrationPaymentSerializer(serializers.ModelSerializer):
