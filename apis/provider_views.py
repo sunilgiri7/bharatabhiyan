@@ -399,19 +399,19 @@ def create_subscription_payment(request):
     )
     
     if not serializer.is_valid():
-        # Check if error is about existing pending subscription
-        if isinstance(serializer.errors.get('non_field_errors', [{}])[0], dict):
-            error_data = serializer.errors['non_field_errors'][0]
+        errors = serializer.errors
+
+        if 'message' in errors:
             return Response({
                 'success': False,
-                'message': error_data.get('message', 'Validation failed'),
-                'subscription_id': error_data.get('subscription_id')
+                'message': errors['message'][0],
+                'subscription_id': errors.get('subscription_id', [None])[0]
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         return Response({
             'success': False,
             'message': 'Validation failed',
-            'errors': serializer.errors
+            'errors': errors
         }, status=status.HTTP_400_BAD_REQUEST)
     
     plan_type = serializer.validated_data['plan_type']
