@@ -48,18 +48,16 @@ def get_service_categories(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_service_types(request):
-    """Get service types, optionally filtered by category"""
-    category_id = request.query_params.get('category_id')
-    
-    if category_id:
-        service_types = ServiceType.objects.filter(
-            category_id=category_id, 
-            is_active=True
-        )
-    else:
-        service_types = ServiceType.objects.filter(is_active=True)
-    
-    serializer = ServiceTypeSerializer(service_types, many=True)
+    category_ids = request.query_params.get('category_id')
+
+    queryset = ServiceType.objects.filter(is_active=True)
+
+    if category_ids:
+        ids = [int(cid) for cid in category_ids.split(',') if cid.isdigit()]
+        queryset = queryset.filter(category_id__in=ids)
+
+    serializer = ServiceTypeSerializer(queryset, many=True)
+
     return Response({
         'success': True,
         'data': serializer.data
