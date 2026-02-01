@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
 from .models import (
-    ServiceCategory, ServiceType, ServiceArea,
+    GovernmentService, ServiceCategory, ServiceQuestion, ServiceType, ServiceArea,
     ServiceProvider, ProviderSubscription
 )
 
@@ -187,3 +187,41 @@ class ProviderSubscriptionAdmin(admin.ModelAdmin):
             obj.get_status_display()
         )
     status_badge.short_description = 'Status'
+
+class ServiceQuestionInline(admin.TabularInline):
+    """
+    Add/Edit questions directly inside a Government Service
+    """
+    model = ServiceQuestion
+    extra = 1
+    fields = ("question", "created_at")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(GovernmentService)
+class GovernmentServiceAdmin(admin.ModelAdmin):
+    list_display = ("name", "short_description", "created_at")
+    search_fields = ("name", "description")
+    ordering = ("-created_at",)
+
+    inlines = [ServiceQuestionInline]
+
+    def short_description(self, obj):
+        if not obj.description:
+            return "—"
+        return obj.description[:60] + ("..." if len(obj.description) > 60 else "")
+
+    short_description.short_description = "Description Preview"
+
+
+@admin.register(ServiceQuestion)
+class ServiceQuestionAdmin(admin.ModelAdmin):
+    list_display = ("question_preview", "service", "created_at")
+    list_filter = ("service", "created_at")
+    search_fields = ("question",)
+    ordering = ("-created_at",)
+
+    def question_preview(self, obj):
+        return obj.question[:70] + ("..." if len(obj.question) > 70 else "")
+
+    question_preview.short_description = "Question"
