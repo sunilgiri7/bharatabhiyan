@@ -19,6 +19,7 @@ urlpatterns = [
     path('providers/service-areas', provider_views.get_service_areas, name='get_service_areas'),
     path('services/', provider_views.get_services, name='get-services'),
     path('providers/by-area/', provider_views.get_services_and_providers, name='providers-by-area'),
+    path("government-services/", views.government_service_api),
     
     # Provider Registration APIs
     path('providers/profile', provider_views.create_provider_profile, name='create_provider_profile'),

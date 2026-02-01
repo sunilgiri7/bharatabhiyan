@@ -1,3 +1,4 @@
+from providers.models import GovernmentService, ServiceQuestion
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,6 +9,8 @@ from django.shortcuts import render, redirect
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from .serializers import (
+    GovernmentServiceSerializer,
+    ServiceQuestionSerializer,
     UserRegistrationSerializer, 
     UserLoginSerializer, 
     UserSerializer,
@@ -394,3 +397,36 @@ def get_ai_guide(request):
             'message': 'An error occurred while processing your request',
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(["GET", "POST"])
+def government_service_api(request):
+    if request.method == "GET":
+        services = GovernmentService.objects.all()
+        serializer = GovernmentServiceSerializer(services, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == "POST":
+        service_id = request.data.get("service_id")
+
+        if not service_id:
+            return Response(
+                {"error": "service_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not GovernmentService.objects.filter(id=service_id).exists():
+            return Response(
+                {"error": "Invalid service_id"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        questions = ServiceQuestion.objects.filter(service_id=service_id)
+        serializer = ServiceQuestionSerializer(questions, many=True)
+
+        return Response(
+            {
+                "service_id": service_id,
+                "questions": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )

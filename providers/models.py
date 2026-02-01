@@ -179,3 +179,26 @@ class ProviderSubscription(models.Model):
     
     def __str__(self):
         return f"{self.provider.business_name} - {self.plan_type} - {self.status}"
+    
+class GovernmentService(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    description = models.TextField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+    
+class ServiceQuestion(models.Model):
+    service = models.ForeignKey(
+        GovernmentService,
+        on_delete=models.CASCADE,
+        related_name="questions"
+    )
+
+    question = models.TextField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.question[:60]

@@ -1,3 +1,4 @@
+from providers.models import GovernmentService, ServiceQuestion
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from accounts.models import UserProfile, RegistrationPayment
@@ -106,3 +107,22 @@ class RegistrationPaymentSerializer(serializers.ModelSerializer):
         model = RegistrationPayment
         fields = ['id', 'amount', 'status', 'gateway_order_id', 'created_at']
         read_only_fields = ['id', 'status', 'created_at']
+
+class ServiceQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceQuestion
+        fields = ["id", "question"]
+
+
+class GovernmentServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GovernmentService
+        fields = ["id", "name", "description"]
+
+
+class GovernmentServiceWithQuestionsSerializer(serializers.ModelSerializer):
+    questions = ServiceQuestionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = GovernmentService
+        fields = ["id", "name", "description", "questions"]
