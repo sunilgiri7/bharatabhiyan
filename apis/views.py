@@ -399,6 +399,7 @@ def get_ai_guide(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 @api_view(["GET", "POST"])
+@permission_classes([AllowAny])
 def government_service_api(request):
     if request.method == "GET":
         services = GovernmentService.objects.all()
