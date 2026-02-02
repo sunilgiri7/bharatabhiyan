@@ -1,13 +1,12 @@
 from google import genai
+from google.genai import types
 from django.conf import settings
 
 
 class GeminiAIService:
     def __init__(self):
-        self.client = genai.Client(
-            api_key=settings.GEMINI_API_KEY
-        )
-        self.model = "gemini-2.0-flash"
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.model_name = "gemini-2.0-flash-exp"  # Free tier model
     
     def get_prompt_template(self, language='english'):
         """Get domain-specific prompt template based on language"""
@@ -75,29 +74,39 @@ Remember to format the entire response in proper HTML as specified above."""
         return formatted_prompt
     
     def get_ai_guide(self, question, language='english'):
+        """Generate AI response using Gemini API"""
         try:
+            # Format the prompt
             formatted_prompt = self.format_user_query(question, language)
             
             # Configure generation parameters
-            generation_config = {
-                'temperature': 0.4,  # more factual responses
-                'top_p': 0.8,
-                'top_k': 40,
-                'max_output_tokens': 2048,
-            }
-            
-            # Generate response
-            response = self.model.generate_content(
-                formatted_prompt,
-                generation_config=generation_config
+            generation_config = types.GenerateContentConfig(
+                temperature=0.4,
+                top_p=0.8,
+                top_k=40,
+                max_output_tokens=2048,
             )
             
-            # Extract and clean the response
+            # Generate response
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=formatted_prompt,
+                config=generation_config
+            )
+            
+            # Validate and extract response
+            if not response or not response.text:
+                return {
+                    'success': False,
+                    'error': 'Empty response from API',
+                    'message': 'Failed to generate AI response'
+                }
+            
             ai_response = response.text.strip()
             
             # Wrap in container div if not already wrapped
             if not ai_response.startswith('<div'):
-                ai_response = f'<div class="BharatAbhiyan-AI-Guide-Response">{ai_response}</div>'
+                ai_response = f'<div class="bharatabhiyan-ai-guide-response">{ai_response}</div>'
             
             return {
                 'success': True,
@@ -106,6 +115,7 @@ Remember to format the entire response in proper HTML as specified above."""
             }
             
         except Exception as e:
+            print(f"Gemini API Error: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),

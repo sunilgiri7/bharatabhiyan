@@ -276,7 +276,7 @@ def create_provider_profile(request):
     }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_provider_profile(request):
     if request.method == 'GET':
         user = request.user

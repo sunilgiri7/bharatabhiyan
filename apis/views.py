@@ -338,7 +338,7 @@ def check_payment_status(request, payment_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def get_ai_guide(request):
     question = request.data.get('question', '').strip()
     language = request.data.get('language', 'english').strip().lower()
@@ -349,12 +349,6 @@ def get_ai_guide(request):
             'success': False,
             'message': 'Question is required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # if len(question) < 5:
-    #     return Response({
-    #         'success': False,
-    #         'message': 'Question is too short. Please provide more details.'
-    #     }, status=status.HTTP_400_BAD_REQUEST)
     
     if len(question) > 500:
         return Response({
