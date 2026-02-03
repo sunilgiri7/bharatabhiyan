@@ -300,11 +300,9 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
     city_name = serializers.CharField(source='city.name', read_only=True)
     state_name = serializers.CharField(source='city.state', read_only=True)
     
-    category_id = serializers.IntegerField(source='service_category.id', read_only=True)
-    category_name = serializers.CharField(source='service_category.name', read_only=True)
-    
-    service_type_id = serializers.IntegerField(source='service_type.id', read_only=True)
-    service_type_name = serializers.CharField(source='service_type.name', read_only=True)
+    # UPDATED: Changed from single fields to MethodFields for lists
+    categories = serializers.SerializerMethodField()
+    service_types_list = serializers.SerializerMethodField()
     
     service_areas_list = ServiceAreaSerializer(source='service_areas', many=True, read_only=True)
     
@@ -324,16 +322,22 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
             'city_name',
             'state_name',
             'pincode',
-            'category_id',
-            'category_name',
-            'service_type_id',
-            'service_type_name',
+            'categories',         
+            'service_types_list', 
             'service_description',
             'service_areas_list',
             'profile_photo_url',
             'verification_status',
             'verification_date',
         ]
+    
+    # Extract list of categories
+    def get_categories(self, obj):
+        return obj.service_categories.values('id', 'name')
+
+    # Extract list of types
+    def get_service_types_list(self, obj):
+        return obj.service_types.values('id', 'name')
     
     def get_profile_photo_url(self, obj):
         if obj.profile_photo:
