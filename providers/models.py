@@ -83,9 +83,9 @@ class ServiceProvider(models.Model):
     city = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, related_name='providers')
     pincode = models.CharField(max_length=10)
     
-    # Service Details
-    service_category = models.ForeignKey(ServiceCategory, on_delete=models.SET_NULL, null=True, related_name='providers')
-    service_type = models.ForeignKey(ServiceType, on_delete=models.SET_NULL, null=True, related_name='providers')
+    # Service Details (UPDATED to ManyToManyField)
+    service_categories = models.ManyToManyField(ServiceCategory, related_name='providers')
+    service_types = models.ManyToManyField(ServiceType, related_name='providers')
     service_description = models.TextField()
     service_areas = models.ManyToManyField(ServiceArea, related_name='providers')
     

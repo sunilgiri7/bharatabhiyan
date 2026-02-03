@@ -343,28 +343,12 @@ def get_ai_guide(request):
     question = request.data.get('question', '').strip()
     language = request.data.get('language', 'english').strip().lower()
     
-    # Validation
     if not question:
         return Response({
             'success': False,
             'message': 'Question is required'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    if len(question) > 500:
-        return Response({
-            'success': False,
-            'message': 'Question is too long. Please limit to 500 characters.'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Validate language
-    supported_languages = ['english', 'hindi']
-    if language not in supported_languages:
-        return Response({
-            'success': False,
-            'message': f'Language not supported. Use: {", ".join(supported_languages)}'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Get AI response
     try:
         ai_service = GeminiAIService()
         result = ai_service.get_ai_guide(question, language)
@@ -372,23 +356,19 @@ def get_ai_guide(request):
         if not result['success']:
             return Response({
                 'success': False,
-                'message': result.get('message', 'Failed to generate response'),
-                'error': result.get('error', '')
+                'message': result.get('message'),
+                'error': result.get('error')
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response({
             'success': True,
-            'data': {
-                'response': result['response'],
-                'language': result['language'],
-                'question': question
-            }
+            'data': result
         })
         
     except Exception as e:
         return Response({
             'success': False,
-            'message': 'An error occurred while processing your request',
+            'message': 'Server error',
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     

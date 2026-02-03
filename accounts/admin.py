@@ -2,18 +2,22 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User, UserProfile, RegistrationPayment
 
-
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
+    # Display configuration
     list_display = ['phone', 'name', 'email', 'is_active', 'is_admin', 'is_captain', 'date_joined']
     list_filter = ['is_active', 'is_admin', 'is_captain', 'date_joined']
     search_fields = ['phone', 'name', 'email']
     ordering = ['-date_joined']
     
+    # Many-to-Many field optimization for permissions
+    filter_horizontal = ('groups', 'user_permissions')
+    
     fieldsets = (
         (None, {'fields': ('phone', 'password')}),
         ('Personal Info', {'fields': ('name', 'email')}),
         ('Roles', {'fields': ('is_admin', 'is_captain')}),
+        # Note: Ensure 'is_staff' exists in your User model, otherwise remove it from here
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
@@ -29,8 +33,12 @@ class UserAdmin(BaseUserAdmin):
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ['user', 'city', 'pincode', 'kyc_status']
-    list_filter = ['kyc_status', 'city']
+    list_filter = ['kyc_status', 'city'] # Ensure 'city' is a field or ForeignKey in UserProfile
     search_fields = ['user__name', 'user__phone', 'pincode']
+    
+    # Optimization: Fetch related user and city data in one query
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user', 'city')
 
 
 @admin.register(RegistrationPayment)

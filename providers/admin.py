@@ -24,9 +24,13 @@ class ServiceCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(ServiceType)
 class ServiceTypeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'is_active', 'created_at']
-    list_filter = ['category', 'is_active']
+    list_display = ['name', 'get_categories', 'is_active', 'created_at']
+    list_filter = ['category', 'is_active'] # Note: 'category' here is the related name from ServiceType model (ForeignKey)
     search_fields = ['name', 'category__name']
+
+    def get_categories(self, obj):
+        return obj.category.name if obj.category else "-"
+    get_categories.short_description = 'Category'
 
 
 @admin.register(ServiceArea)
@@ -38,22 +42,32 @@ class ServiceAreaAdmin(admin.ModelAdmin):
 
 @admin.register(ServiceProvider)
 class ServiceProviderAdmin(admin.ModelAdmin):
+    # UPDATED: 'service_category' removed, added 'get_categories_display'
     list_display = [
         'application_id', 'business_name', 'user_name', 'user_phone',
-        'verification_status_badge', 'city', 'submitted_at'
+        'verification_status_badge', 'get_categories_display', 'city', 'submitted_at'
     ]
+    
+    # UPDATED: Filter by the new ManyToMany fields
     list_filter = [
-        'verification_status', 'service_category', 'city',
-        'experience', 'submitted_at'
+        'verification_status', 
+        'service_categories', # Renamed from service_category
+        'service_types',      # Added service_types
+        'city',
+        'experience', 
+        'submitted_at'
     ]
+    
     search_fields = [
         'application_id', 'business_name', 'user__name',
         'user__phone', 'user__email'
     ]
+    
     readonly_fields = [
         'application_id', 'user', 'created_at', 'updated_at', 'submitted_at'
     ]
     
+    # UPDATED: Fieldsets to include new M2M fields
     fieldsets = (
         ('Application Info', {
             'fields': ('application_id', 'user', 'verification_status', 'submitted_at')
@@ -66,7 +80,9 @@ class ServiceProviderAdmin(admin.ModelAdmin):
         }),
         ('Service Details', {
             'fields': (
-                'service_category', 'service_type', 'service_description',
+                'service_categories', # Renamed
+                'service_types',      # Renamed
+                'service_description',
                 'service_areas'
             )
         }),
@@ -86,6 +102,11 @@ class ServiceProviderAdmin(admin.ModelAdmin):
         }),
     )
     
+    # NEW: Helper to display M2M categories in list_display
+    def get_categories_display(self, obj):
+        return ", ".join([c.name for c in obj.service_categories.all()])
+    get_categories_display.short_description = 'Service Categories'
+
     def user_name(self, obj):
         return obj.user.name
     user_name.short_description = 'Provider Name'

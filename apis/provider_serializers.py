@@ -25,6 +25,17 @@ class ServiceAreaSerializer(serializers.ModelSerializer):
 
 
 class ServiceProviderCreateSerializer(serializers.ModelSerializer):
+    # Updated to handle lists of IDs
+    service_categories = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=True
+    )
+    service_types = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=True
+    )
     service_areas = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
@@ -34,18 +45,11 @@ class ServiceProviderCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceProvider
         fields = [
-            # Basic Information (auto-filled from user)
             'whatsapp_number',
-            
-            # Business Details
             'business_name', 'experience', 'business_address',
             'city', 'pincode',
-            
-            # Service Details
-            'service_category', 'service_type', 'service_description',
+            'service_categories', 'service_types', 'service_description',
             'service_areas',
-            
-            # Documents
             'aadhaar_front', 'aadhaar_back',
             'address_proof_type', 'address_proof',
             'profile_photo', 'skill_certificate',
@@ -67,47 +71,74 @@ class ServiceProviderCreateSerializer(serializers.ModelSerializer):
     def validate_service_areas(self, value):
         if not value:
             raise serializers.ValidationError("At least one service area is required")
-        # Verify all service area IDs exist
         valid_areas = ServiceArea.objects.filter(id__in=value, is_active=True)
         if len(valid_areas) != len(value):
             raise serializers.ValidationError("Invalid service area selected")
         return value
-    
+
     def validate(self, data):
-        # Check if user already has a provider profile
         user = self.context['request'].user
+        
+        # Check existing profile
         if ServiceProvider.objects.filter(user=user).exists():
             raise serializers.ValidationError("You already have a service provider profile")
         
-        # Validate service type belongs to selected category
-        if data.get('service_type') and data.get('service_category'):
-            if data['service_type'].category != data['service_category']:
-                raise serializers.ValidationError("Service type doesn't match selected category")
-        
+        # Validate Categories
+        cat_ids = data.get('service_categories', [])
+        valid_cats = ServiceCategory.objects.filter(id__in=cat_ids, is_active=True)
+        if len(valid_cats) != len(cat_ids):
+            raise serializers.ValidationError("One or more invalid service categories selected.")
+
+        # Validate Types against Categories
+        type_ids = data.get('service_types', [])
+        if type_ids and cat_ids:
+            # Check if all types belong to the selected categories
+            valid_types = ServiceType.objects.filter(
+                id__in=type_ids, 
+                category__id__in=cat_ids,
+                is_active=True
+            )
+            
+            # If the count of found valid types differs from input, some were invalid or didn't match category
+            if len(valid_types) != len(type_ids):
+                raise serializers.ValidationError(
+                    "One or more service types do not match the selected service categories or are invalid."
+                )
+                
         return data
     
     def create(self, validated_data):
+        # Pop many-to-many data
         service_areas = validated_data.pop('service_areas')
+        service_categories = validated_data.pop('service_categories')
+        service_types = validated_data.pop('service_types')
+        
         user = self.context['request'].user
         
-        # Create provider profile
+        # Create provider instance
         provider = ServiceProvider.objects.create(
             user=user,
             verification_status='DRAFT',
             **validated_data
         )
         
-        # Set service areas
+        # Set relationships
         provider.service_areas.set(service_areas)
+        provider.service_categories.set(service_categories)
+        provider.service_types.set(service_types)
         
         return provider
 
 
 class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
+    service_categories = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
+    )
+    service_types = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
+    )
     service_areas = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=False
+        child=serializers.IntegerField(), write_only=True, required=False
     )
     
     class Meta:
@@ -115,28 +146,35 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'whatsapp_number', 'business_name', 'experience', 
             'business_address', 'city', 'pincode',
-            'service_category', 'service_type', 'service_description',
+            'service_categories', 'service_types', 'service_description',
             'service_areas', 'aadhaar_front', 'aadhaar_back',
             'address_proof_type', 'address_proof', 'profile_photo',
             'skill_certificate'
         ]
     
     def validate(self, data):
-        # Can only update if status is DRAFT or REJECTED
         if self.instance.verification_status not in ['DRAFT', 'REJECTED']:
-            raise serializers.ValidationError(
-                "Cannot update application after submission"
-            )
+            raise serializers.ValidationError("Cannot update application after submission")
+            
         return data
     
     def update(self, instance, validated_data):
+        # Extract M2M fields
         service_areas = validated_data.pop('service_areas', None)
+        service_categories = validated_data.pop('service_categories', None)
+        service_types = validated_data.pop('service_types', None)
         
+        # Update simple fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
+        # Update M2M fields if provided
         if service_areas is not None:
             instance.service_areas.set(service_areas)
+        if service_categories is not None:
+            instance.service_categories.set(service_categories)
+        if service_types is not None:
+            instance.service_types.set(service_types)
         
         instance.save()
         return instance
@@ -159,8 +197,11 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(source='user.email', read_only=True)
     city_name = serializers.CharField(source='city.name', read_only=True)
     state_name = serializers.CharField(source='city.state', read_only=True)
-    category_name = serializers.CharField(source='service_category.name', read_only=True)
-    service_type_name = serializers.CharField(source='service_type.name', read_only=True)
+    
+    # Updated to return lists
+    categories = serializers.SerializerMethodField()
+    service_types_list = serializers.SerializerMethodField()
+    
     service_areas_list = ServiceAreaSerializer(source='service_areas', many=True, read_only=True)
     verified_by_name = serializers.CharField(source='verified_by.name', read_only=True)
     verified_by_id = serializers.CharField(source='verified_by.id', read_only=True)
@@ -173,7 +214,7 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
             'id', 'application_id', 'user_name', 'user_phone', 'user_email',
             'whatsapp_number', 'business_name', 'experience',
             'business_address', 'city', 'city_name', 'state_name', 'pincode',
-            'service_category', 'category_name', 'service_type', 'service_type_name',
+            'categories', 'service_types_list', # Renamed fields
             'service_description', 'service_areas_list',
             'registration_payment_status',
             'aadhaar_front', 'aadhaar_back', 'address_proof_type', 'address_proof',
@@ -188,6 +229,12 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
             'verification_date', 'rejection_reason', 'submitted_at',
             'created_at', 'updated_at'
         ]
+
+    def get_categories(self, obj):
+        return obj.service_categories.values('id', 'name', 'icon')
+
+    def get_service_types_list(self, obj):
+        return obj.service_types.values('id', 'name', 'category__name')
 
     def get_registration_payment_status(self, obj):
         payment = (
