@@ -18,6 +18,7 @@ from providers.models import (
     ServiceProvider, ServiceCategory, ServiceType,
     ServiceArea, ProviderSubscription
 )
+from django.shortcuts import get_object_or_404
 from .provider_serializers import (
     ServiceProviderCreateSerializer, ServiceProviderUpdateSerializer,
     ServiceProviderDetailSerializer, ServiceProviderSubmitSerializer,
@@ -299,42 +300,103 @@ def create_provider_profile(request):
     }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
+@permission_classes([AllowAny]) # kept as requested, but ensure security!
+@parser_classes([MultiPartParser, FormParser]) # Needed for file uploads
 def get_provider_profile(request):
+    
+    # --- GET REQUEST (Retrieve Profile) ---
     if request.method == 'GET':
-        user = request.user
-
-    else:  # POST
-        user_id = request.data.get('user_id')
-
-        if not user_id:
+        # Logic: Check if user_id is passed (e.g. for admin), else use logged-in user
+        user_id = request.query_params.get('user_id')
+        
+        if user_id:
+            user = get_object_or_404(User, id=user_id)
+        elif request.user.is_authenticated:
+            user = request.user
+        else:
             return Response({
                 'success': False,
-                'message': 'user_id is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
+                'message': 'Authentication or user_id required'
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
+            provider = user.provider_profile
+            serializer = ServiceProviderDetailSerializer(provider)
+            return Response({
+                'success': True,
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        except ServiceProvider.DoesNotExist:
             return Response({
                 'success': False,
-                'message': 'User not found'
+                'message': 'Provider profile not found'
             }, status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        provider = user.provider_profile
-        serializer = ServiceProviderDetailSerializer(provider)
+    # --- POST REQUEST (Create or Update Profile) ---
+    elif request.method == 'POST':
+        if not request.user.is_authenticated:
+            return Response({
+                'success': False,
+                'message': 'You must be logged in to save a profile'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+            
+        user = request.user
+        
+        # 1. PREPARE DATA: Fix for multiple values in Form-Data
+        # We must copy request.data to make it mutable or just create a new dict
+        data = request.data.copy()
 
-        return Response({
-            'success': True,
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+        # CRITICAL FIX: Explicitly get lists for M2M fields
+        # This ensures [8, 5, 4] are all captured, not just the last one
+        categories = request.data.getlist('service_category') 
+        types = request.data.getlist('service_type')
+        areas = request.data.getlist('service_areas') # Check your postman key for this too
 
-    except ServiceProvider.DoesNotExist:
+        # Update the data dictionary with the full lists
+        # Note: We map 'service_category' (input) to 'service_categories' (serializer field)
+        data.setlist('service_categories', categories) 
+        data.setlist('service_types', types)
+        data.setlist('service_areas', areas)
+
+        try:
+            # Check if profile exists
+            provider = user.provider_profile
+            
+            # --- UPDATE EXISTING ---
+            serializer = ServiceProviderUpdateSerializer(
+                provider,
+                data=data, # Use our fixed data object
+                context={'request': request},
+                partial=True
+            )
+            action_message = "Profile updated successfully (Status reset to Draft)"
+
+        except ServiceProvider.DoesNotExist:
+            # --- CREATE NEW ---
+            serializer = ServiceProviderCreateSerializer(
+                data=data, # Use our fixed data object
+                context={'request': request}
+            )
+            action_message = "Profile created successfully"
+
+        # 2. Validate and Save
+        if serializer.is_valid():
+            provider_instance = serializer.save()
+            
+            # 3. Return the full detail response
+            detail_serializer = ServiceProviderDetailSerializer(provider_instance)
+            
+            return Response({
+                'success': True,
+                'message': action_message,
+                'data': detail_serializer.data
+            }, status=status.HTTP_200_OK)
+            
         return Response({
             'success': False,
-            'message': 'Provider profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+            'message': 'Validation Failed',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])

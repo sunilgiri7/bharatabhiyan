@@ -24,112 +24,53 @@ class ServiceTypeSerializer(serializers.ModelSerializer):
 
 
 class ServiceProviderCreateSerializer(serializers.ModelSerializer):
-    # Updated to handle lists of IDs
+    # Use ListField to accept arrays of IDs
     service_categories = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=True
+        child=serializers.IntegerField(), write_only=True, required=True
     )
     service_types = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=True
+        child=serializers.IntegerField(), write_only=True, required=True
     )
     service_areas = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=True
+        child=serializers.IntegerField(), write_only=True, required=True
     )
     
     class Meta:
         model = ServiceProvider
         fields = [
-            'whatsapp_number',
-            'business_name', 'experience', 'business_address',
+            'whatsapp_number', 'business_name', 'experience', 'business_address',
             'city', 'pincode',
             'service_categories', 'service_types', 'service_description',
-            'service_areas',
-            'aadhaar_front', 'aadhaar_back',
-            'address_proof_type', 'address_proof',
-            'profile_photo', 'skill_certificate',
+            'service_areas', 'aadhaar_front', 'aadhaar_back',
+            'address_proof_type', 'address_proof', 'profile_photo',
+            'skill_certificate',
         ]
-    
-    def validate_whatsapp_number(self, value):
-        if not value.startswith('+91'):
-            if len(value) == 10:
-                value = f'+91{value}'
-            else:
-                raise serializers.ValidationError("Invalid WhatsApp number format")
-        return value
-    
-    def validate_service_description(self, value):
-        if len(value) < 50:
-            raise serializers.ValidationError("Description must be at least 50 characters")
-        return value
-    
-    def validate_service_areas(self, value):
-        if not value:
-            raise serializers.ValidationError("At least one service area is required")
-        valid_areas = ServiceArea.objects.filter(id__in=value, is_active=True)
-        if len(valid_areas) != len(value):
-            raise serializers.ValidationError("Invalid service area selected")
-        return value
 
-    def validate(self, data):
-        user = self.context['request'].user
-        
-        # Check existing profile
-        if ServiceProvider.objects.filter(user=user).exists():
-            raise serializers.ValidationError("You already have a service provider profile")
-        
-        # Validate Categories
-        cat_ids = data.get('service_categories', [])
-        valid_cats = ServiceCategory.objects.filter(id__in=cat_ids, is_active=True)
-        if len(valid_cats) != len(cat_ids):
-            raise serializers.ValidationError("One or more invalid service categories selected.")
-
-        # Validate Types against Categories
-        type_ids = data.get('service_types', [])
-        if type_ids and cat_ids:
-            # Check if all types belong to the selected categories
-            valid_types = ServiceType.objects.filter(
-                id__in=type_ids, 
-                category__id__in=cat_ids,
-                is_active=True
-            )
-            
-            # If the count of found valid types differs from input, some were invalid or didn't match category
-            if len(valid_types) != len(type_ids):
-                raise serializers.ValidationError(
-                    "One or more service types do not match the selected service categories or are invalid."
-                )
-                
-        return data
-    
     def create(self, validated_data):
-        # Pop many-to-many data
-        service_areas = validated_data.pop('service_areas')
-        service_categories = validated_data.pop('service_categories')
-        service_types = validated_data.pop('service_types')
+        # 1. Extract M2M data
+        categories = validated_data.pop('service_categories', [])
+        types = validated_data.pop('service_types', [])
+        areas = validated_data.pop('service_areas', [])
         
         user = self.context['request'].user
         
-        # Create provider instance
+        # 2. Create Provider
         provider = ServiceProvider.objects.create(
-            user=user,
-            verification_status='DRAFT',
+            user=user, 
+            verification_status='DRAFT', # Default status
             **validated_data
         )
         
-        # Set relationships
-        provider.service_areas.set(service_areas)
-        provider.service_categories.set(service_categories)
-        provider.service_types.set(service_types)
+        # 3. Set Relationships
+        provider.service_categories.set(categories)
+        provider.service_types.set(types)
+        provider.service_areas.set(areas)
         
         return provider
 
 
 class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
+    # Optional ListFields for updates
     service_categories = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False
     )
@@ -143,37 +84,36 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceProvider
         fields = [
-            'whatsapp_number', 'business_name', 'experience', 
-            'business_address', 'city', 'pincode',
+            'whatsapp_number', 'business_name', 'experience', 'business_address',
+            'city', 'pincode',
             'service_categories', 'service_types', 'service_description',
             'service_areas', 'aadhaar_front', 'aadhaar_back',
             'address_proof_type', 'address_proof', 'profile_photo',
-            'skill_certificate'
+            'skill_certificate',
         ]
     
-    def validate(self, data):
-        if self.instance.verification_status not in ['DRAFT', 'REJECTED']:
-            raise serializers.ValidationError("Cannot update application after submission")
-            
-        return data
-    
     def update(self, instance, validated_data):
-        # Extract M2M fields
-        service_areas = validated_data.pop('service_areas', None)
-        service_categories = validated_data.pop('service_categories', None)
-        service_types = validated_data.pop('service_types', None)
+        # 1. Extract M2M data
+        categories = validated_data.pop('service_categories', None)
+        types = validated_data.pop('service_types', None)
+        areas = validated_data.pop('service_areas', None)
         
-        # Update simple fields
+        # 2. Update Basic Fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
-        # Update M2M fields if provided
-        if service_areas is not None:
-            instance.service_areas.set(service_areas)
-        if service_categories is not None:
-            instance.service_categories.set(service_categories)
-        if service_types is not None:
-            instance.service_types.set(service_types)
+            
+        # 3. Update Relationships (only if provided)
+        if categories is not None:
+            instance.service_categories.set(categories)
+        if types is not None:
+            instance.service_types.set(types)
+        if areas is not None:
+            instance.service_areas.set(areas)
+            
+        # 4. CRITICAL: Reset Status to DRAFT on update
+        instance.verification_status = 'DRAFT'
+        instance.rejection_reason = '' # Clear any previous rejection reason
+        instance.verified_by = None
         
         instance.save()
         return instance
