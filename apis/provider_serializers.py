@@ -300,12 +300,18 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
     city_name = serializers.CharField(source='city.name', read_only=True)
     state_name = serializers.CharField(source='city.state', read_only=True)
     
-    # --- UPDATED FIELDS FOR LISTS ---
+    # --- NEW LIST FIELDS (for full support) ---
     categories = serializers.SerializerMethodField()
     service_types_list = serializers.SerializerMethodField()
     
-    service_areas_list = ServiceAreaSerializer(source='service_areas', many=True, read_only=True)
+    # --- BACKWARD COMPATIBILITY FIELDS (Single Value) ---
+    # These return the *first* category/type so old frontend code doesn't break
+    category_id = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
+    service_type_id = serializers.SerializerMethodField()
+    service_type_name = serializers.SerializerMethodField()
     
+    service_areas_list = ServiceAreaSerializer(source='service_areas', many=True, read_only=True)
     profile_photo_url = serializers.SerializerMethodField()
     
     class Meta:
@@ -322,8 +328,17 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
             'city_name',
             'state_name',
             'pincode',
-            'categories',         # Renamed from category_id/name
-            'service_types_list', # Renamed from service_type_id/name
+            
+            # New Lists
+            'categories',
+            'service_types_list',
+            
+            # Old Single Fields (Backward Compatibility)
+            'category_id',
+            'category_name',
+            'service_type_id',
+            'service_type_name',
+            
             'service_description',
             'service_areas_list',
             'profile_photo_url',
@@ -331,14 +346,30 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
             'verification_date',
         ]
     
-    # Helper to return list of categories
+    # --- Methods for Lists ---
     def get_categories(self, obj):
         return obj.service_categories.values('id', 'name')
 
-    # Helper to return list of service types
     def get_service_types_list(self, obj):
         return obj.service_types.values('id', 'name')
     
+    # --- Methods for Single Fields (Backward Compatibility) ---
+    def get_category_id(self, obj):
+        first = obj.service_categories.first()
+        return first.id if first else None
+
+    def get_category_name(self, obj):
+        first = obj.service_categories.first()
+        return first.name if first else None
+
+    def get_service_type_id(self, obj):
+        first = obj.service_types.first()
+        return first.id if first else None
+
+    def get_service_type_name(self, obj):
+        first = obj.service_types.first()
+        return first.name if first else None
+
     def get_profile_photo_url(self, obj):
         if obj.profile_photo:
             request = self.context.get('request')

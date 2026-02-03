@@ -89,9 +89,11 @@ def get_service_areas(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_services(request):
+    # Get parameters
     category_ids = request.query_params.get('categories', '').strip()
     service_type_ids = request.query_params.get('service_types', '').strip()
     
+    # 1. Validate Category Input
     if not category_ids:
         return Response({
             'success': False,
@@ -106,7 +108,7 @@ def get_services(request):
             'message': 'Invalid category IDs format'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # If service_types are provided, return providers
+    # 2. Logic: If Service Types provided -> Return Providers
     if service_type_ids:
         try:
             service_type_list = [int(id.strip()) for id in service_type_ids.split(',') if id.strip()]
@@ -116,20 +118,22 @@ def get_services(request):
                 'message': 'Invalid service_types format'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # --- LOGIC UPDATE FOR MANY-TO-MANY ---
+        # KEY FIX: Use 'service_categories__id__in' (plural) instead of 'service_category_id__in'
         providers = ServiceProvider.objects.filter(
-            service_categories__id__in=category_list, # Updated field name
-            service_types__id__in=service_type_list,  # Updated field name
+            service_categories__id__in=category_list,
+            service_types__id__in=service_type_list,
             verification_status='VERIFIED'
         ).select_related(
-            'user', 'city'  # Removed service_category/type (they are now M2M)
+            'user', 
+            'city'
         ).prefetch_related(
             'service_areas',
-            'service_categories', # Moved to prefetch
-            'service_types'       # Moved to prefetch
-        ).distinct() # Required to prevent duplicate results
+            'service_categories',  # Prefetch the M2M fields
+            'service_types'
+        ).distinct()  # DISTINCT is required for Many-to-Many filtering to avoid duplicates
         
         serializer = ServiceProviderListSerializer(providers, many=True, context={'request': request})
+        
         return Response({
             'success': True,
             'data': {
@@ -138,7 +142,8 @@ def get_services(request):
             }
         })
     
-    # Only categories provided, return service types
+    # 3. Logic: Only Categories provided -> Return Service Types
+    # This logic remains correct as ServiceType still has a single ForeignKey to Category
     service_types = ServiceType.objects.filter(
         category_id__in=category_list,
         is_active=True
