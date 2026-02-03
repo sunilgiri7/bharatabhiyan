@@ -12,16 +12,15 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'icon', 'description']
 
 
-class ServiceTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ServiceType
-        fields = ['id', 'name', 'category']
-
-
 class ServiceAreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceArea
         fields = ['id', 'name', 'location']
+
+class ServiceTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceType
+        fields = ['id', 'name', 'category']
 
 
 class ServiceProviderCreateSerializer(serializers.ModelSerializer):
@@ -291,7 +290,7 @@ class ProviderSubscriptionCreateSerializer(serializers.Serializer):
         return data
 
 class ServiceProviderListSerializer(serializers.ModelSerializer):
-    """Serializer for listing providers with essential details"""
+    """Serializer for listing providers with backward compatibility"""
     
     user_name = serializers.CharField(source='user.name', read_only=True)
     user_phone = serializers.CharField(source='user.phone', read_only=True)
@@ -300,12 +299,12 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
     city_name = serializers.CharField(source='city.name', read_only=True)
     state_name = serializers.CharField(source='city.state', read_only=True)
     
-    # --- NEW LIST FIELDS (for full support) ---
+    # --- New Fields for Lists (The accurate data) ---
     categories = serializers.SerializerMethodField()
     service_types_list = serializers.SerializerMethodField()
     
-    # --- BACKWARD COMPATIBILITY FIELDS (Single Value) ---
-    # These return the *first* category/type so old frontend code doesn't break
+    # --- Backward Compatibility Fields (Prevent frontend crash) ---
+    # These return the FIRST category/type found, so old code still works
     category_id = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
     service_type_id = serializers.SerializerMethodField()
@@ -329,15 +328,10 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
             'state_name',
             'pincode',
             
-            # New Lists
-            'categories',
-            'service_types_list',
-            
-            # Old Single Fields (Backward Compatibility)
-            'category_id',
-            'category_name',
-            'service_type_id',
-            'service_type_name',
+            # Both new and old fields
+            'categories', 'service_types_list',
+            'category_id', 'category_name',
+            'service_type_id', 'service_type_name',
             
             'service_description',
             'service_areas_list',
@@ -346,30 +340,31 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
             'verification_date',
         ]
     
-    # --- Methods for Lists ---
+    # New: Return all categories
     def get_categories(self, obj):
         return obj.service_categories.values('id', 'name')
 
+    # New: Return all types
     def get_service_types_list(self, obj):
         return obj.service_types.values('id', 'name')
-    
-    # --- Methods for Single Fields (Backward Compatibility) ---
+
+    # Old: Return just the first one to satisfy legacy frontend
     def get_category_id(self, obj):
-        first = obj.service_categories.first()
-        return first.id if first else None
+        cat = obj.service_categories.first()
+        return cat.id if cat else None
 
     def get_category_name(self, obj):
-        first = obj.service_categories.first()
-        return first.name if first else None
+        cat = obj.service_categories.first()
+        return cat.name if cat else None
 
     def get_service_type_id(self, obj):
-        first = obj.service_types.first()
-        return first.id if first else None
+        st = obj.service_types.first()
+        return st.id if st else None
 
     def get_service_type_name(self, obj):
-        first = obj.service_types.first()
-        return first.name if first else None
-
+        st = obj.service_types.first()
+        return st.name if st else None
+    
     def get_profile_photo_url(self, obj):
         if obj.profile_photo:
             request = self.context.get('request')

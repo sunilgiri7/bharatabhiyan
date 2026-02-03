@@ -89,7 +89,6 @@ def get_service_areas(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_services(request):
-    # Get parameters
     category_ids = request.query_params.get('categories', '').strip()
     service_type_ids = request.query_params.get('service_types', '').strip()
     
@@ -108,7 +107,7 @@ def get_services(request):
             'message': 'Invalid category IDs format'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # 2. Logic: If Service Types provided -> Return Providers
+    # 2. Logic: If Service Types provided -> Return PROVIDERS
     if service_type_ids:
         try:
             service_type_list = [int(id.strip()) for id in service_type_ids.split(',') if id.strip()]
@@ -118,19 +117,19 @@ def get_services(request):
                 'message': 'Invalid service_types format'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # KEY FIX: Use 'service_categories__id__in' (plural) instead of 'service_category_id__in'
+        # --- FIX: Use Many-to-Many lookup (plural field names) ---
         providers = ServiceProvider.objects.filter(
-            service_categories__id__in=category_list,
-            service_types__id__in=service_type_list,
-            verification_status='VERIFIED'
+            service_categories__id__in=category_list, # Was: service_category_id
+            service_types__id__in=service_type_list,  # Was: service_type_id
+            verification_status='VERIFIED'            # NOTE: Only verified providers show up!
         ).select_related(
             'user', 
             'city'
         ).prefetch_related(
             'service_areas',
-            'service_categories',  # Prefetch the M2M fields
-            'service_types'
-        ).distinct()  # DISTINCT is required for Many-to-Many filtering to avoid duplicates
+            'service_categories', # Prefetch M2M
+            'service_types'       # Prefetch M2M
+        ).distinct() # DISTINCT is vital for M2M filtering to avoid duplicates
         
         serializer = ServiceProviderListSerializer(providers, many=True, context={'request': request})
         
@@ -142,8 +141,7 @@ def get_services(request):
             }
         })
     
-    # 3. Logic: Only Categories provided -> Return Service Types
-    # This logic remains correct as ServiceType still has a single ForeignKey to Category
+    # 3. Logic: Only Categories provided -> Return SERVICE TYPES
     service_types = ServiceType.objects.filter(
         category_id__in=category_list,
         is_active=True
@@ -181,6 +179,8 @@ def get_services_and_providers(request):
             'message': str(e)
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    # 1. Logic: Only Categories Provided -> Return Service Types
+    # (This part is fine as ServiceType still has a single Foreign Key to Category)
     if category_list and not service_type_list and not service_area_list:
         service_types = ServiceType.objects.filter(
             category_id__in=category_list,
@@ -197,29 +197,42 @@ def get_services_and_providers(request):
             }
         })
 
+    # 2. Validation: Ensure at least one filter exists
     if not (category_list or service_type_list or service_area_list):
         return Response({
             'success': False,
             'message': 'At least one of categories, service_types or service_areas is required'
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    # 3. Build Filters for Providers
     filters = Q(verification_status='VERIFIED')
 
-    # if category_list:
-    #     filters &= Q(service_category_id__in=category_list)
+    # FIX: Updated Lookups for Many-to-Many (Use plural field names)
     if category_list:
-        filters &= Q(service_category_id__in=category_list)
-        filters &= Q(service_type__category_id__in=category_list)
+        # Check if provider has any of these categories
+        filters &= Q(service_categories__id__in=category_list)
+        
+        # Optional: Ensure the provider's service types also belong to these categories
+        # Note: 'service_types' is the M2M field name on Provider
+        filters &= Q(service_types__category__id__in=category_list)
 
     if service_type_list:
-        filters &= Q(service_type_id__in=service_type_list)
+        # Check if provider offers any of these specific service types
+        filters &= Q(service_types__id__in=service_type_list)
 
     if service_area_list:
         filters &= Q(service_areas__id__in=service_area_list)
 
+    # 4. Fetch Providers (Optimized)
+    # FIX: Removed 'service_category'/'service_type' from select_related (they are lists now)
+    # FIX: Added them to prefetch_related
     providers = ServiceProvider.objects.filter(filters).distinct().select_related(
-        'user', 'city', 'service_category', 'service_type'
-    ).prefetch_related('service_areas')
+        'user', 'city'
+    ).prefetch_related(
+        'service_areas',
+        'service_categories', # Prefetch the categories list
+        'service_types'       # Prefetch the types list
+    )
 
     serializer = ServiceProviderListSerializer(
         providers,
