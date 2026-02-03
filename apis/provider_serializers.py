@@ -300,7 +300,7 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
     city_name = serializers.CharField(source='city.name', read_only=True)
     state_name = serializers.CharField(source='city.state', read_only=True)
     
-    # UPDATED: Changed from single fields to MethodFields for lists
+    # --- UPDATED FIELDS FOR LISTS ---
     categories = serializers.SerializerMethodField()
     service_types_list = serializers.SerializerMethodField()
     
@@ -322,8 +322,8 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
             'city_name',
             'state_name',
             'pincode',
-            'categories',         
-            'service_types_list', 
+            'categories',         # Renamed from category_id/name
+            'service_types_list', # Renamed from service_type_id/name
             'service_description',
             'service_areas_list',
             'profile_photo_url',
@@ -331,11 +331,11 @@ class ServiceProviderListSerializer(serializers.ModelSerializer):
             'verification_date',
         ]
     
-    # Extract list of categories
+    # Helper to return list of categories
     def get_categories(self, obj):
         return obj.service_categories.values('id', 'name')
 
-    # Extract list of types
+    # Helper to return list of service types
     def get_service_types_list(self, obj):
         return obj.service_types.values('id', 'name')
     

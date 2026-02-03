@@ -116,18 +116,18 @@ def get_services(request):
                 'message': 'Invalid service_types format'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # UPDATED QUERY LOGIC
+        # --- LOGIC UPDATE FOR MANY-TO-MANY ---
         providers = ServiceProvider.objects.filter(
-            service_categories__id__in=category_list, # Changed from service_category_id
-            service_types__id__in=service_type_list,  # Changed from service_type_id
+            service_categories__id__in=category_list, # Updated field name
+            service_types__id__in=service_type_list,  # Updated field name
             verification_status='VERIFIED'
         ).select_related(
-            'user', 'city'  # Removed service_category/type from here (they are M2M now)
+            'user', 'city'  # Removed service_category/type (they are now M2M)
         ).prefetch_related(
-            'service_areas', 
+            'service_areas',
             'service_categories', # Moved to prefetch
             'service_types'       # Moved to prefetch
-        ).distinct() # Required for M2M filtering to avoid duplicates
+        ).distinct() # Required to prevent duplicate results
         
         serializer = ServiceProviderListSerializer(providers, many=True, context={'request': request})
         return Response({
