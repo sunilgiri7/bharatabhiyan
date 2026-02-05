@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from providers.models import (
-    ServiceProvider, ServiceCategory, ServiceType, 
+    ServicePricing, ServiceProvider, ServiceCategory, ServiceType, 
     ServiceArea, ProviderSubscription
 )
 from django.utils import timezone
@@ -24,7 +24,7 @@ class ServiceTypeSerializer(serializers.ModelSerializer):
 
 
 class ServiceProviderCreateSerializer(serializers.ModelSerializer):
-    # Use ListField to accept arrays of IDs
+
     service_categories = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=True
     )
@@ -34,43 +34,56 @@ class ServiceProviderCreateSerializer(serializers.ModelSerializer):
     service_areas = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=True
     )
-    
+
+    service_costs = serializers.JSONField(required=False)
+
     class Meta:
         model = ServiceProvider
         fields = [
-            'whatsapp_number', 'business_name', 'experience', 'business_address',
-            'city', 'pincode',
-            'service_categories', 'service_types', 'service_description',
-            'service_areas', 'aadhaar_front', 'aadhaar_back',
-            'address_proof_type', 'address_proof', 'profile_photo',
-            'skill_certificate',
+            'whatsapp_number', 'business_name', 'experience',
+            'business_address', 'city', 'pincode',
+
+            'service_categories', 'service_types',
+            'service_description', 'service_areas',
+
+            'service_costs',
+
+            'aadhaar_front', 'aadhaar_back',
+            'address_proof_type', 'address_proof',
+            'profile_photo', 'skill_certificate',
         ]
 
     def create(self, validated_data):
-        # 1. Extract M2M data
-        categories = validated_data.pop('service_categories', [])
-        types = validated_data.pop('service_types', [])
-        areas = validated_data.pop('service_areas', [])
-        
+        categories = validated_data.pop('service_categories')
+        types = validated_data.pop('service_types')
+        areas = validated_data.pop('service_areas')
+        service_costs = validated_data.pop('service_costs', [])
+
         user = self.context['request'].user
-        
-        # 2. Create Provider
+
         provider = ServiceProvider.objects.create(
-            user=user, 
-            verification_status='DRAFT', # Default status
+            user=user,
+            verification_status='DRAFT',
             **validated_data
         )
-        
-        # 3. Set Relationships
+
         provider.service_categories.set(categories)
         provider.service_types.set(types)
         provider.service_areas.set(areas)
-        
+
+        # 💰 Save pricing
+        for cost in service_costs:
+            ServicePricing.objects.create(
+                provider=provider,
+                service_type_id=cost['service_type'],
+                price=cost['price']
+            )
+
         return provider
 
 
 class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
-    # Optional ListFields for updates
+
     service_categories = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False
     )
@@ -80,44 +93,76 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
     service_areas = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False
     )
-    
+
+    service_costs = serializers.JSONField(required=False)
+
     class Meta:
         model = ServiceProvider
         fields = [
-            'whatsapp_number', 'business_name', 'experience', 'business_address',
-            'city', 'pincode',
-            'service_categories', 'service_types', 'service_description',
-            'service_areas', 'aadhaar_front', 'aadhaar_back',
-            'address_proof_type', 'address_proof', 'profile_photo',
-            'skill_certificate',
+            'whatsapp_number', 'business_name', 'experience',
+            'business_address', 'city', 'pincode',
+
+            'service_categories', 'service_types',
+            'service_description', 'service_areas',
+
+            'service_costs',
+
+            'aadhaar_front', 'aadhaar_back',
+            'address_proof_type', 'address_proof',
+            'profile_photo', 'skill_certificate',
         ]
-    
+
     def update(self, instance, validated_data):
-        # 1. Extract M2M data
         categories = validated_data.pop('service_categories', None)
         types = validated_data.pop('service_types', None)
         areas = validated_data.pop('service_areas', None)
-        
-        # 2. Update Basic Fields
+        service_costs = validated_data.pop('service_costs', None)
+
+        # Basic field updates
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-            
-        # 3. Update Relationships (only if provided)
+
         if categories is not None:
             instance.service_categories.set(categories)
+
         if types is not None:
             instance.service_types.set(types)
+
         if areas is not None:
             instance.service_areas.set(areas)
-            
-        # 4. CRITICAL: Reset Status to DRAFT on update
+
+        # 💰 Replace pricing cleanly
+        if service_costs is not None:
+            ServicePricing.objects.filter(provider=instance).delete()
+
+            for cost in service_costs:
+                ServicePricing.objects.create(
+                    provider=instance,
+                    service_type_id=cost['service_type'],
+                    price=cost['price']
+                )
+
+        # 🔁 Reset verification on edit (your logic intact)
         instance.verification_status = 'DRAFT'
-        instance.rejection_reason = '' # Clear any previous rejection reason
+        instance.rejection_reason = ''
         instance.verified_by = None
-        
+
         instance.save()
         return instance
 
+class ServicePricingSerializer(serializers.ModelSerializer):
+    service_type_name = serializers.CharField(
+        source='service_type.name',
+        read_only=True
+    )
+
+    class Meta:
+        model = ServicePricing
+        fields = [
+            'service_type',
+            'service_type_name',
+            'price'
+        ]
 
 class ServiceProviderSubmitSerializer(serializers.Serializer):
     """Serializer for submitting application for verification"""
@@ -131,41 +176,68 @@ class ServiceProviderSubmitSerializer(serializers.Serializer):
         return data
 
 class ServiceProviderDetailSerializer(serializers.ModelSerializer):
+
     user_name = serializers.CharField(source='user.name', read_only=True)
     user_phone = serializers.CharField(source='user.phone', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
+
     city_name = serializers.CharField(source='city.name', read_only=True)
     state_name = serializers.CharField(source='city.state', read_only=True)
-    
-    # Updated to return lists
+
     categories = serializers.SerializerMethodField()
     service_types_list = serializers.SerializerMethodField()
-    
-    service_areas_list = ServiceAreaSerializer(source='service_areas', many=True, read_only=True)
-    verified_by_name = serializers.CharField(source='verified_by.name', read_only=True)
-    verified_by_id = serializers.CharField(source='verified_by.id', read_only=True)
+
+    service_areas_list = ServiceAreaSerializer(
+        source='service_areas',
+        many=True,
+        read_only=True
+    )
+
+    service_costs = serializers.SerializerMethodField()
+
+    verified_by_name = serializers.CharField(
+        source='verified_by.name',
+        read_only=True
+    )
+    verified_by_id = serializers.CharField(
+        source='verified_by.id',
+        read_only=True
+    )
 
     registration_payment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceProvider
         fields = [
-            'id', 'application_id', 'user_name', 'user_phone', 'user_email',
+            'id', 'application_id',
+
+            'user_name', 'user_phone', 'user_email',
+
             'whatsapp_number', 'business_name', 'experience',
             'business_address', 'city', 'city_name', 'state_name', 'pincode',
-            'categories', 'service_types_list', # Renamed fields
+
+            'categories', 'service_types_list',
             'service_description', 'service_areas_list',
+
+            'service_costs',
+
             'registration_payment_status',
-            'aadhaar_front', 'aadhaar_back', 'address_proof_type', 'address_proof',
+
+            'aadhaar_front', 'aadhaar_back',
+            'address_proof_type', 'address_proof',
             'profile_photo', 'skill_certificate',
-            'verification_status', 'verified_by', 'verified_by_name', 'verified_by_id',
+
+            'verification_status',
+            'verified_by', 'verified_by_name', 'verified_by_id',
             'verification_date', 'rejection_reason',
-            'submitted_at', 'created_at', 'updated_at',
+
+            'submitted_at', 'created_at', 'updated_at'
         ]
 
         read_only_fields = [
-            'id', 'application_id', 'verification_status', 'verified_by',
-            'verification_date', 'rejection_reason', 'submitted_at',
+            'id', 'application_id', 'verification_status',
+            'verified_by', 'verification_date',
+            'rejection_reason', 'submitted_at',
             'created_at', 'updated_at'
         ]
 
@@ -175,12 +247,15 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
     def get_service_types_list(self, obj):
         return obj.service_types.values('id', 'name', 'category__name')
 
-    def get_registration_payment_status(self, obj):
-        payment = (
-            obj.user.registration_payments
-            .order_by('-created_at')
-            .first()
+    def get_service_costs(self, obj):
+        return obj.service_pricings.values(
+            'service_type_id',
+            'service_type__name',
+            'price'
         )
+
+    def get_registration_payment_status(self, obj):
+        payment = obj.user.registration_payments.order_by('-created_at').first()
         return payment.status if payment else None
 
 

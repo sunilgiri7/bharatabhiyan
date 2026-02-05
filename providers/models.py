@@ -142,6 +142,29 @@ class ServiceProvider(models.Model):
         
         super().save(*args, **kwargs)
 
+class ServicePricing(models.Model):
+    provider = models.ForeignKey(
+        ServiceProvider,
+        on_delete=models.CASCADE,
+        related_name='service_pricings'
+    )
+    service_type = models.ForeignKey(
+        ServiceType,
+        on_delete=models.CASCADE,
+        related_name='provider_pricings'
+    )
+
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('provider', 'service_type')
+        db_table = 'service_pricing'
+
+    def __str__(self):
+        return f"{self.provider.business_name} - {self.service_type.name} - {self.price}"
 
 class ProviderSubscription(models.Model):
     PLAN_CHOICES = [
