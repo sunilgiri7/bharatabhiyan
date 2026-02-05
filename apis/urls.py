@@ -22,7 +22,7 @@ urlpatterns = [
     path("government-services/", views.government_service_api),
     
     # Provider Registration APIs
-    path('providers/profile', provider_views.create_provider_profile, name='create_provider_profile'),
+    path('providers/profile', provider_views.create_or_update_provider_profile, name='create_or_update_provider_profile'),
     path('providers/profile/me', provider_views.get_provider_profile, name='get_provider_profile'),
     path('providers/profile/submit', provider_views.submit_provider_application, name='submit_provider_application'),
     
