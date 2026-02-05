@@ -34,4 +34,5 @@ urlpatterns = [
     path('providers/subscription/active', provider_views.get_active_subscription, name='get_active_subscription'),
 
     path('ai/guide/', views.get_ai_guide, name='ai-guide'),
+    path('service-answer/', views.service_question_answer_api, name='service_question_answer'),
 ]

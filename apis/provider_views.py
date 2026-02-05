@@ -306,7 +306,6 @@ def get_provider_profile(request):
     
     # --- GET REQUEST (Retrieve Profile) ---
     if request.method == 'GET':
-        # Logic: Check if user_id is passed (e.g. for admin), else use logged-in user
         user_id = request.query_params.get('user_id')
         
         if user_id:
@@ -334,20 +333,15 @@ def get_provider_profile(request):
 
     # --- POST REQUEST (Create or Update Profile) ---
     elif request.method == 'POST':
-        if not request.user.is_authenticated:
-            return Response({
-                'success': False,
-                'message': 'You must be logged in to save a profile'
-            }, status=status.HTTP_401_UNAUTHORIZED)
+        # if not request.user.is_authenticated:
+        #     return Response({
+        #         'success': False,
+        #         'message': 'You must be logged in to save a profile'
+        #     }, status=status.HTTP_401_UNAUTHORIZED)
             
         user = request.user
-        
-        # 1. PREPARE DATA: Fix for multiple values in Form-Data
-        # We must copy request.data to make it mutable or just create a new dict
         data = request.data.copy()
 
-        # CRITICAL FIX: Explicitly get lists for M2M fields
-        # This ensures [8, 5, 4] are all captured, not just the last one
         categories = request.data.getlist('service_category') 
         types = request.data.getlist('service_type')
         areas = request.data.getlist('service_areas') # Check your postman key for this too

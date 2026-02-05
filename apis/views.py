@@ -1,4 +1,4 @@
-from providers.models import GovernmentService, ServiceQuestion
+from providers.models import GovernmentService, ServiceQuestion, ServiceQuestionAnswer
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -405,3 +405,37 @@ def government_service_api(request):
             },
             status=status.HTTP_200_OK
         )
+    
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def service_question_answer_api(request):
+    question_id = request.query_params.get("question_id")
+    language = request.query_params.get("language", "english")  # default to english
+
+    if not question_id:
+        return Response(
+            {"error": "question_id is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        answer = ServiceQuestionAnswer.objects.select_related(
+            'question', 'question__service'
+        ).get(question_id=question_id)
+    except ServiceQuestionAnswer.DoesNotExist:
+        return Response(
+            {"error": "Answer not found for this question"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Return answer based on language preference
+    response_data = {
+        "question_id": question_id,
+        "question": answer.question.question,
+        "service_name": answer.question.service.name,
+        "answer": answer.answer_hindi if language.lower() == "hindi" else answer.answer_english,
+        # "answer_english": answer.answer_english,
+        # "answer_hindi": answer.answer_hindi
+    }
+
+    return Response(response_data, status=status.HTTP_200_OK)

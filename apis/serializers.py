@@ -1,4 +1,4 @@
-from providers.models import GovernmentService, ServiceQuestion
+from providers.models import GovernmentService, ServiceQuestion, ServiceQuestionAnswer
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from accounts.models import UserProfile, RegistrationPayment
@@ -126,3 +126,13 @@ class GovernmentServiceWithQuestionsSerializer(serializers.ModelSerializer):
     class Meta:
         model = GovernmentService
         fields = ["id", "name", "description", "questions"]
+
+class ServiceQuestionAnswerSerializer(serializers.ModelSerializer):
+    question_text = serializers.CharField(source='question.question', read_only=True)
+    service_name = serializers.CharField(source='question.service.name', read_only=True)
+    
+    class Meta:
+        model = ServiceQuestionAnswer
+        fields = ["id", "question", "question_text", "service_name", 
+                  "answer_english", "answer_hindi", "created_at", "updated_at"]
+        read_only_fields = ["created_at", "updated_at"]

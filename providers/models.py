@@ -202,3 +202,22 @@ class ServiceQuestion(models.Model):
 
     def __str__(self):
         return self.question[:60]
+    
+class ServiceQuestionAnswer(models.Model):
+    question = models.OneToOneField(
+        ServiceQuestion,
+        on_delete=models.CASCADE,
+        related_name="answer"
+    )
+    answer_english = models.TextField()
+    answer_hindi = models.TextField()
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Answer for: {self.question.question[:50]}"
+
+    class Meta:
+        verbose_name = "Service Question Answer"
+        verbose_name_plural = "Service Question Answers"
