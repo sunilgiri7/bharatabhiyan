@@ -311,40 +311,39 @@ def create_or_update_provider_profile(request):
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def get_provider_profile(request):
+
     if request.method == 'GET':
-        user = request.user
-
-    else:  # POST
-        user_id = request.data.get('user_id')
-
-        if not user_id:
+        try:
+            provider = request.user.provider_profile
+        except ServiceProvider.DoesNotExist:
             return Response({
                 'success': False,
-                'message': 'user_id is required'
+                'message': 'Provider profile not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    else:  # POST
+        provider_id = request.data.get('user_id')
+
+        if not provider_id:
+            return Response({
+                'success': False,
+                'message': 'provider_id is required'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
+            provider = ServiceProvider.objects.get(id=provider_id)
+        except ServiceProvider.DoesNotExist:
             return Response({
                 'success': False,
-                'message': 'User not found'
+                'message': 'Provider not found'
             }, status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        provider = user.provider_profile
-        serializer = ServiceProviderDetailSerializer(provider)
+    serializer = ServiceProviderDetailSerializer(provider)
 
-        return Response({
-            'success': True,
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
-
-    except ServiceProvider.DoesNotExist:
-        return Response({
-            'success': False,
-            'message': 'Provider profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+    return Response({
+        'success': True,
+        'data': serializer.data
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
