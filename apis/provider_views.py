@@ -199,11 +199,11 @@ def get_services_and_providers(request):
         })
 
     # 2. Validation: Ensure at least one filter exists
-    if not (category_list or service_type_list or service_area_list):
-        return Response({
-            'success': False,
-            'message': 'At least one of categories, service_types or service_areas is required'
-        }, status=status.HTTP_400_BAD_REQUEST)
+    # if not (category_list or service_type_list or service_area_list):
+    #     return Response({
+    #         'success': False,
+    #         'message': 'At least one of categories, service_types or service_areas is required'
+    #     }, status=status.HTTP_400_BAD_REQUEST)
 
     # 3. Build Filters for Providers
     filters = Q(verification_status='VERIFIED')
