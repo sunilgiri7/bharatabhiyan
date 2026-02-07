@@ -350,8 +350,9 @@ def get_provider_profile(request):
 @permission_classes([IsAuthenticated])
 def submit_provider_application(request):
     """Submit provider application for captain verification"""
+
     user = request.user
-    
+
     try:
         provider = user.provider_profile
     except ServiceProvider.DoesNotExist:
@@ -359,15 +360,18 @@ def submit_provider_application(request):
             'success': False,
             'message': 'Provider profile not found. Please create your profile first.'
         }, status=status.HTTP_404_NOT_FOUND)
-    
-    # Check if already submitted
+
+    # 🔄 Always work with the latest data (critical after draft updates)
+    provider.refresh_from_db()
+
+    # 🚫 Prevent duplicate submissions
     if provider.verification_status not in ['DRAFT', 'REJECTED']:
         return Response({
             'success': False,
             'message': f'Application already {provider.verification_status.lower()}'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Validate declarations
+
+    # ✅ Validate declarations
     serializer = ServiceProviderSubmitSerializer(data=request.data)
     if not serializer.is_valid():
         return Response({
@@ -375,48 +379,67 @@ def submit_provider_application(request):
             'message': 'All declarations must be accepted',
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Validate required fields
+
+    # 📋 Required field validation (UPDATED for M2M fields)
     required_fields = [
-        'whatsapp_number', 'business_name', 'experience',
-        'business_address', 'city', 'pincode',
-        'service_category', 'service_type', 'service_description',
-        'aadhaar_front', 'aadhaar_back',
-        'address_proof_type', 'address_proof', 'profile_photo'
+        'whatsapp_number',
+        'business_name',
+        'experience',
+        'business_address',
+        'city',
+        'pincode',
+        'service_categories',
+        'service_types',
+        'service_description',
+        'aadhaar_front',
+        'aadhaar_back',
+        'address_proof_type',
+        'address_proof',
+        'profile_photo',
     ]
-    
+
     missing_fields = []
+
     for field in required_fields:
-        if not getattr(provider, field):
+        # Handle ManyToMany fields correctly
+        if field in ['service_categories', 'service_types', 'service_areas']:
+            if not getattr(provider, field).exists():
+                missing_fields.append(field.replace('_', ' ').title())
+            continue
+
+        value = getattr(provider, field, None)
+        if not value:
             missing_fields.append(field.replace('_', ' ').title())
-    
+
     if missing_fields:
         return Response({
             'success': False,
             'message': 'Please complete all required fields',
             'missing_fields': missing_fields
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Check service areas
+
     if not provider.service_areas.exists():
         return Response({
             'success': False,
             'message': 'Please select at least one service area'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Update status
+
+    # 🚀 Submit for verification
     provider.verification_status = 'PENDING_VERIFICATION'
     provider.submitted_at = timezone.now()
-    provider.rejection_reason = ''  # Clear previous rejection reason
+    provider.rejection_reason = ''
     provider.save()
-    
-    detail_serializer = ServiceProviderDetailSerializer(provider)
-    
+
+    detail_serializer = ServiceProviderDetailSerializer(
+        provider,
+        context={'request': request}
+    )
+
     return Response({
         'success': True,
         'message': 'Application submitted successfully. A captain will verify your details within 2-3 business days.',
         'data': detail_serializer.data
-    })
+    }, status=status.HTTP_200_OK)
 
 
 # ===== Subscription & Payment APIs =====
