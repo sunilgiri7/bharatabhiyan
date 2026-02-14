@@ -36,10 +36,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_admin = models.BooleanField(default=False)
     is_captain = models.BooleanField(default=False)
     is_user = models.BooleanField(default=True)
+    is_provider_register = models.BooleanField(default=False)  # NEW FIELD
     
     # Captain specific
     captain_code = models.CharField(max_length=20, unique=True, null=True, blank=True)
-    admin_verified = models.BooleanField(default=False)  # NEW FIELD
+    admin_verified = models.BooleanField(default=False)
     
     # Status flags
     is_active = models.BooleanField(default=True)  

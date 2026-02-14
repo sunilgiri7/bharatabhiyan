@@ -63,13 +63,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         # Set role flags based on logic
         validated_data['is_captain'] = is_captain
         validated_data['is_user'] = not (is_captain or is_provider)
+        validated_data['is_provider_register'] = is_provider  # NEW: Store provider registration intent
         
         # Generate captain code if is_captain is True
         if is_captain:
             validated_data['captain_code'] = self.generate_unique_captain_code()
             validated_data['admin_verified'] = False  # Captain needs admin verification
         else:
-            validated_data['admin_verified'] = True  # Regular users don't need admin verification
+            validated_data['admin_verified'] = True  # Regular users and providers don't need admin verification
         
         user = User.objects.create(**validated_data)
         
@@ -80,10 +81,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         # Create profile automatically
         UserProfile.objects.create(user=user)
         
-        # Create provider profile if is_provider is True
-        if is_provider:
-            from providers.models import ProviderProfile
-            ProviderProfile.objects.create(user=user)
+        # DON'T create ServiceProvider here - it will be created via create_or_update_provider_profile API
         
         return user
 
@@ -110,14 +108,16 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'phone', 'email', 'name',
             'is_active', 'is_admin', 'is_captain', 'is_user',
-            'captain_code', 'admin_verified',  # Added admin_verified
+            'is_provider_register',  # NEW FIELD
+            'captain_code', 'admin_verified',
             'date_joined',
             'is_provider',
             'registration_payment_status',
         ]
 
         read_only_fields = [
-            'id', 'is_active', 'is_admin', 'is_captain', 'is_user', 
+            'id', 'is_active', 'is_admin', 'is_captain', 'is_user',
+            'is_provider_register',  # NEW FIELD
             'captain_code', 'admin_verified', 'date_joined'
         ]
 
