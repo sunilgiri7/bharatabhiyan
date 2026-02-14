@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from accounts.models import CaptainProfile, User, UserProfile
 from .models import (
-    GovernmentService, ServiceCategory, ServiceQuestion, ServiceType, ServiceArea,
+    GovernmentService, ServiceCategory, ServiceQuestion, ServiceQuestionAnswer, ServiceType, ServiceArea,
     ServiceProvider, ProviderSubscription
 )
 
@@ -401,3 +401,20 @@ class CaptainProfileAdmin(admin.ModelAdmin):
 #     list_display = ['id', 'user', 'city', 'kyc_status']
 #     list_filter = ['kyc_status']
 #     search_fields = ['user__name', 'user__phone']
+
+# @admin.register(ServiceQuestion)
+# class ServiceQuestionAdmin(admin.ModelAdmin):
+#     list_display = ('id', 'service', 'question', 'created_at')
+#     search_fields = ('question',)
+#     list_filter = ('service', 'created_at')
+
+
+@admin.register(ServiceQuestionAnswer)
+class ServiceQuestionAnswerAdmin(admin.ModelAdmin):
+    list_display = ('id', 'question', 'short_answer_english', 'created_at', 'updated_at')
+    search_fields = ('question__question', 'answer_english', 'answer_hindi')
+    list_filter = ('created_at', 'updated_at')
+
+    def short_answer_english(self, obj):
+        return obj.answer_english[:50]
+    short_answer_english.short_description = "Answer (English)"

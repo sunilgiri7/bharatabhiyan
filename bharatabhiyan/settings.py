@@ -3,7 +3,7 @@ from datetime import timedelta
 import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wju_67_wl244=&xwbg#9rbox%%^+8k5nsuz$b48fk7&nexvh!3'
-DEBUG = True
+DEBUG = False
 ALLOWED_HOSTS = [
 "bharatabhiyan.onrender.com",
 "bharatabhiyan-frontend.vercel.app",
@@ -19,6 +19,7 @@ CORS_ALLOWED_ORIGINS = [
 "http://localhost:5173",
 "http://localhost:8080",
 ]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CORS_ALLOW_HEADERS = [
     "accept",
     "accept-encoding",
@@ -32,6 +33,7 @@ CORS_ALLOW_HEADERS = [
 ]
 CSRF_TRUSTED_ORIGINS = [
 "https://bharatabhiyan-frontend.vercel.app",
+"https://bharatabhiyan.onrender.com",
 ]
 
 # Application definition
