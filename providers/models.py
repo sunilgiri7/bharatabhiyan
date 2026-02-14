@@ -110,6 +110,8 @@ class ServiceProvider(models.Model):
     )
     verification_date = models.DateTimeField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True)
+    verification_image = models.ImageField(upload_to='provider_docs/verification/', null=True, blank=True)  # NEW FIELD
+    rejection_reason = models.TextField(blank=True)
     
     # Timestamps
     submitted_at = models.DateTimeField(null=True, blank=True)

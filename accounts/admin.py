@@ -2,32 +2,32 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User, UserProfile, RegistrationPayment
 
-@admin.register(User)
-class UserAdmin(BaseUserAdmin):
-    # Display configuration
-    list_display = ['phone', 'name', 'email', 'is_active', 'is_admin', 'is_captain', 'date_joined']
-    list_filter = ['is_active', 'is_admin', 'is_captain', 'date_joined']
-    search_fields = ['phone', 'name', 'email']
-    ordering = ['-date_joined']
+# @admin.register(User)
+# class UserAdmin(BaseUserAdmin):
+#     # Display configuration
+#     list_display = ['phone', 'name', 'email', 'is_active', 'is_admin', 'is_captain', 'date_joined']
+#     list_filter = ['is_active', 'is_admin', 'is_captain', 'date_joined']
+#     search_fields = ['phone', 'name', 'email']
+#     ordering = ['-date_joined']
     
-    # Many-to-Many field optimization for permissions
-    filter_horizontal = ('groups', 'user_permissions')
+#     # Many-to-Many field optimization for permissions
+#     filter_horizontal = ('groups', 'user_permissions')
     
-    fieldsets = (
-        (None, {'fields': ('phone', 'password')}),
-        ('Personal Info', {'fields': ('name', 'email')}),
-        ('Roles', {'fields': ('is_admin', 'is_captain')}),
-        # Note: Ensure 'is_staff' exists in your User model, otherwise remove it from here
-        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Important dates', {'fields': ('last_login', 'date_joined')}),
-    )
+#     fieldsets = (
+#         (None, {'fields': ('phone', 'password')}),
+#         ('Personal Info', {'fields': ('name', 'email')}),
+#         ('Roles', {'fields': ('is_admin', 'is_captain')}),
+#         # Note: Ensure 'is_staff' exists in your User model, otherwise remove it from here
+#         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+#         ('Important dates', {'fields': ('last_login', 'date_joined')}),
+#     )
     
-    add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('phone', 'name', 'email', 'password1', 'password2', 'is_active'),
-        }),
-    )
+#     add_fieldsets = (
+#         (None, {
+#             'classes': ('wide',),
+#             'fields': ('phone', 'name', 'email', 'password1', 'password2', 'is_active'),
+#         }),
+#     )
 
 
 @admin.register(UserProfile)

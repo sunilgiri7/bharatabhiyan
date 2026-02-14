@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
+
+from accounts.models import CaptainProfile, User, UserProfile
 from .models import (
     GovernmentService, ServiceCategory, ServiceQuestion, ServiceType, ServiceArea,
     ServiceProvider, ProviderSubscription
@@ -246,3 +248,156 @@ class ServiceQuestionAdmin(admin.ModelAdmin):
         return obj.question[:70] + ("..." if len(obj.question) > 70 else "")
 
     question_preview.short_description = "Question"
+
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'phone', 'email', 'is_captain', 'is_user', 'admin_verified', 'is_active', 'date_joined']
+    list_filter = ['is_captain', 'is_user', 'admin_verified', 'is_active', 'date_joined']
+    search_fields = ['name', 'phone', 'email', 'captain_code']
+    readonly_fields = ['date_joined', 'captain_code']
+    
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('phone', 'email', 'name', 'password')
+        }),
+        ('Role & Permissions', {
+            'fields': ('is_captain', 'is_user', 'is_admin', 'is_staff', 'is_superuser')
+        }),
+        ('Captain Details', {
+            'fields': ('captain_code', 'admin_verified')
+        }),
+        ('Status', {
+            'fields': ('is_active', 'date_joined')
+        }),
+    )
+
+
+@admin.register(CaptainProfile)
+class CaptainProfileAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 
+        'captain_name', 
+        'captain_code', 
+        'phone', 
+        'verification_status_badge', 
+        'created_at'
+    ]
+    list_filter = ['verification_status', 'created_at']
+    search_fields = ['user__name', 'user__captain_code', 'phone']
+    readonly_fields = [
+        'user', 
+        'created_at', 
+        'updated_at', 
+        'verified_by', 
+        'verification_date',
+        'display_aadhaar_front',
+        'display_aadhaar_back'
+    ]
+    
+    fieldsets = (
+        ('Captain Information', {
+            'fields': ('user', 'phone')
+        }),
+        ('Documents', {
+            'fields': ('display_aadhaar_front', 'display_aadhaar_back')
+        }),
+        ('Verification Details', {
+            'fields': (
+                'verification_status', 
+                'verified_by', 
+                'verification_date', 
+                'rejection_reason'
+            )
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
+    
+    actions = ['verify_captains', 'reject_captains']
+    
+    def captain_name(self, obj):
+        return obj.user.name
+    captain_name.short_description = 'Captain Name'
+    
+    def captain_code(self, obj):
+        return obj.user.captain_code
+    captain_code.short_description = 'Captain Code'
+    
+    def verification_status_badge(self, obj):
+        colors = {
+            'PENDING': 'orange',
+            'VERIFIED': 'green',
+            'REJECTED': 'red'
+        }
+        color = colors.get(obj.verification_status, 'gray')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>',
+            color,
+            obj.get_verification_status_display()
+        )
+    verification_status_badge.short_description = 'Status'
+    
+    def display_aadhaar_front(self, obj):
+        if obj.aadhaar_front:
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" style="max-width: 300px; max-height: 200px;"/></a>',
+                obj.aadhaar_front.url,
+                obj.aadhaar_front.url
+            )
+        return "No image"
+    display_aadhaar_front.short_description = 'Aadhaar Front'
+    
+    def display_aadhaar_back(self, obj):
+        if obj.aadhaar_back:
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" style="max-width: 300px; max-height: 200px;"/></a>',
+                obj.aadhaar_back.url,
+                obj.aadhaar_back.url
+            )
+        return "No image"
+    display_aadhaar_back.short_description = 'Aadhaar Back'
+    
+    def verify_captains(self, request, queryset):
+        """Verify selected captains"""
+        updated = 0
+        for captain_profile in queryset.filter(verification_status='PENDING'):
+            captain_profile.verification_status = 'VERIFIED'
+            captain_profile.verified_by = request.user
+            captain_profile.verification_date = timezone.now()
+            captain_profile.rejection_reason = ''
+            captain_profile.save()
+            
+            # Update user's admin_verified flag
+            captain_profile.user.admin_verified = True
+            captain_profile.user.save()
+            
+            updated += 1
+        
+        self.message_user(request, f'{updated} captain(s) verified successfully.')
+    verify_captains.short_description = 'Verify selected captains'
+    
+    def reject_captains(self, request, queryset):
+        """Reject selected captains"""
+        updated = 0
+        for captain_profile in queryset.filter(verification_status='PENDING'):
+            captain_profile.verification_status = 'REJECTED'
+            captain_profile.verified_by = request.user
+            captain_profile.verification_date = timezone.now()
+            captain_profile.save()
+            
+            # Update user's admin_verified flag
+            captain_profile.user.admin_verified = False
+            captain_profile.user.save()
+            
+            updated += 1
+        
+        self.message_user(request, f'{updated} captain(s) rejected.')
+    reject_captains.short_description = 'Reject selected captains'
+
+
+# @admin.register(UserProfile)
+# class UserProfileAdmin(admin.ModelAdmin):
+#     list_display = ['id', 'user', 'city', 'kyc_status']
+#     list_filter = ['kyc_status']
+#     search_fields = ['user__name', 'user__phone']

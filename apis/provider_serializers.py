@@ -206,6 +206,10 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
         source='verified_by.id',
         read_only=True
     )
+    verified_by_captain_code = serializers.CharField(
+        source='verified_by.captain_code',
+        read_only=True
+    )
 
     registration_payment_status = serializers.SerializerMethodField()
 
@@ -231,15 +235,15 @@ class ServiceProviderDetailSerializer(serializers.ModelSerializer):
             'profile_photo', 'skill_certificate',
 
             'verification_status',
-            'verified_by', 'verified_by_name', 'verified_by_id',
-            'verification_date', 'rejection_reason',
+            'verified_by', 'verified_by_name', 'verified_by_id', 'verified_by_captain_code',
+            'verification_date', 'verification_image', 'rejection_reason',
 
             'submitted_at', 'created_at', 'updated_at'
         ]
 
         read_only_fields = [
             'id', 'application_id', 'verification_status',
-            'verified_by', 'verification_date',
+            'verified_by', 'verification_date', 'verification_image',
             'rejection_reason', 'submitted_at',
             'created_at', 'updated_at'
         ]

@@ -35,6 +35,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Role flags
     is_admin = models.BooleanField(default=False)
     is_captain = models.BooleanField(default=False)
+    is_user = models.BooleanField(default=True)
+    
+    # Captain specific
+    captain_code = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    admin_verified = models.BooleanField(default=False)  # NEW FIELD
     
     # Status flags
     is_active = models.BooleanField(default=True)  
@@ -59,6 +64,45 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"{self.name} ({self.phone})"
 
+
+class CaptainProfile(models.Model):
+    VERIFICATION_STATUS_CHOICES = [
+        ('PENDING', 'Pending Verification'),
+        ('VERIFIED', 'Verified'),
+        ('REJECTED', 'Rejected'),
+    ]
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='captain_profile')
+    phone = models.CharField(max_length=15)
+    aadhaar_front = models.ImageField(upload_to='captain_docs/aadhaar/')
+    aadhaar_back = models.ImageField(upload_to='captain_docs/aadhaar/')
+    
+    verification_status = models.CharField(
+        max_length=20, 
+        choices=VERIFICATION_STATUS_CHOICES, 
+        default='PENDING'
+    )
+    verified_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='verified_captains',
+        limit_choices_to={'is_admin': True}
+    )
+    verification_date = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'captain_profiles'
+        verbose_name = 'Captain Profile'
+        verbose_name_plural = 'Captain Profiles'
+    
+    def __str__(self):
+        return f"{self.user.name} - {self.user.captain_code}"
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')

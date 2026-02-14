@@ -4,16 +4,19 @@ from django.contrib.auth import get_user_model
 from accounts.models import UserProfile, RegistrationPayment
 from django.utils import timezone
 User = get_user_model()
-
+import random
+import string
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     phone = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
+    is_captain = serializers.BooleanField(required=False, default=False)
+    is_provider = serializers.BooleanField(required=False, default=False)
     
     class Meta:
         model = User
-        fields = ['phone', 'email', 'name', 'password']
+        fields = ['phone', 'email', 'name', 'password', 'is_captain', 'is_provider']
     
     def validate(self, data):
         phone = data.get('phone', '').strip() if data.get('phone') else ''
@@ -38,14 +41,35 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Email already registered")
         return value
     
+    def generate_unique_captain_code(self):
+        """Generate a unique captain code"""
+        while True:
+            code = 'CAP' + ''.join(random.choices(string.digits, k=8))
+            if not User.objects.filter(captain_code=code).exists():
+                return code
+    
     def create(self, validated_data):
         password = validated_data.pop('password', None)
+        is_captain = validated_data.pop('is_captain', False)
+        is_provider = validated_data.pop('is_provider', False)
+        
         # Clean up empty strings to None
         phone = validated_data.get('phone')
         email = validated_data.get('email')
         
         validated_data['phone'] = phone.strip() if phone else None
         validated_data['email'] = email.strip() if email else None
+        
+        # Set role flags based on logic
+        validated_data['is_captain'] = is_captain
+        validated_data['is_user'] = not (is_captain or is_provider)
+        
+        # Generate captain code if is_captain is True
+        if is_captain:
+            validated_data['captain_code'] = self.generate_unique_captain_code()
+            validated_data['admin_verified'] = False  # Captain needs admin verification
+        else:
+            validated_data['admin_verified'] = True  # Regular users don't need admin verification
         
         user = User.objects.create(**validated_data)
         
@@ -56,8 +80,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         # Create profile automatically
         UserProfile.objects.create(user=user)
         
+        # Create provider profile if is_provider is True
+        if is_provider:
+            from providers.models import ProviderProfile
+            ProviderProfile.objects.create(user=user)
+        
         return user
-
 
 class UserLoginSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True)
@@ -81,13 +109,16 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'phone', 'email', 'name',
-            'is_active', 'is_admin', 'is_captain', 'date_joined',
+            'is_active', 'is_admin', 'is_captain', 'is_user',
+            'captain_code', 'admin_verified',  # Added admin_verified
+            'date_joined',
             'is_provider',
             'registration_payment_status',
         ]
 
         read_only_fields = [
-            'id', 'is_active', 'is_admin', 'is_captain', 'date_joined'
+            'id', 'is_active', 'is_admin', 'is_captain', 'is_user', 
+            'captain_code', 'admin_verified', 'date_joined'
         ]
 
     def get_is_provider(self, obj):

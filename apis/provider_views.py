@@ -361,7 +361,6 @@ def submit_provider_application(request):
             'message': 'Provider profile not found. Please create your profile first.'
         }, status=status.HTTP_404_NOT_FOUND)
 
-    # 🔄 Always work with the latest data (critical after draft updates)
     provider.refresh_from_db()
 
     # 🚫 Prevent duplicate submissions

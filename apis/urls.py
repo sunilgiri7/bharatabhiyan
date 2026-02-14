@@ -6,6 +6,7 @@ urlpatterns = [
     path('auth/register', views.register, name='register'),
     path('auth/login', views.login, name='login'),
     path('auth/me', views.me, name='me'),
+    path('captain/submit-verification/', views.submit_captain_verification, name='submit-captain-verification'),
     
     # User Registration Payment
     path('payments/registration/create-link', views.create_payment_link, name='create_payment_link'),
@@ -35,4 +36,7 @@ urlpatterns = [
 
     path('ai/guide/', views.get_ai_guide, name='ai-guide'),
     path('service-answer/', views.service_question_answer_api, name='service_question_answer'),
+
+    path('captain/pending-providers/', views.list_pending_providers, name='list-pending-providers'),
+    path('captain/verify-provider/', views.verify_provider_service, name='verify-provider-service'),
 ]

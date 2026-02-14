@@ -1,4 +1,5 @@
-from providers.models import GovernmentService, ServiceQuestion, ServiceQuestionAnswer
+from apis.provider_serializers import ServiceProviderDetailSerializer
+from providers.models import GovernmentService, ServiceProvider, ServiceQuestion, ServiceQuestionAnswer
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,12 +17,14 @@ from .serializers import (
     UserSerializer,
     RegistrationPaymentSerializer
 )
-from accounts.models import RegistrationPayment
+from accounts.models import CaptainProfile, RegistrationPayment
 import razorpay
 import hmac
 from .services.gemini_service import GeminiAIService
 import hashlib
-
+from django.utils import timezone
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.decorators import parser_classes
 User = get_user_model()
 
 # Initialize Razorpay Client
@@ -89,6 +92,16 @@ def login(request):
             'message': 'Account not activated. Please complete payment.',
             'user_id': user.id,
             'requires_payment': True
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Check if captain is verified by admin
+    if user.is_captain and not user.admin_verified:
+        return Response({
+            'success': False,
+            'message': 'Your captain account is pending admin verification. Please submit your verification documents.',
+            'user_id': user.id,
+            'requires_verification': True,
+            'admin_verified': False
         }, status=status.HTTP_403_FORBIDDEN)
     
     # Generate tokens
@@ -439,3 +452,219 @@ def service_question_answer_api(request):
     }
 
     return Response(response_data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_pending_providers(request):
+    """List all provider services pending verification (Captain only)"""
+    
+    user = request.user
+    
+    # Check if user is captain
+    if not user.is_captain:
+        return Response({
+            'success': False,
+            'message': 'Only captains can access this resource'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get all providers with PENDING_VERIFICATION status
+    providers = ServiceProvider.objects.filter(
+        verification_status='PENDING_VERIFICATION'
+    ).order_by('-submitted_at')
+    
+    serializer = ServiceProviderDetailSerializer(
+        providers,
+        many=True,
+        context={'request': request}
+    )
+    
+    return Response({
+        'success': True,
+        'count': providers.count(),
+        'data': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def verify_provider_service(request):
+    """Verify a provider service application (Captain only)"""
+    
+    user = request.user
+    
+    # Check if user is captain
+    if not user.is_captain:
+        return Response({
+            'success': False,
+            'message': 'Only captains can verify provider services'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get form data
+    profile_id = request.data.get('profile_id')
+    captain_code = request.data.get('captain_code')
+    verification_image = request.FILES.get('image')
+    
+    # Validate required fields
+    if not profile_id:
+        return Response({
+            'success': False,
+            'message': 'profile_id is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not captain_code:
+        return Response({
+            'success': False,
+            'message': 'captain_code is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not verification_image:
+        return Response({
+            'success': False,
+            'message': 'image is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate captain code matches authenticated user
+    if user.captain_code != captain_code:
+        return Response({
+            'success': False,
+            'message': 'Invalid captain code'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get the provider service
+    try:
+        provider = ServiceProvider.objects.get(id=profile_id)
+    except ServiceProvider.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Provider profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if already verified
+    if provider.verification_status == 'VERIFIED':
+        return Response({
+            'success': False,
+            'message': 'This provider is already verified'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Check if status is PENDING_VERIFICATION
+    if provider.verification_status != 'PENDING_VERIFICATION':
+        return Response({
+            'success': False,
+            'message': f'Provider status is {provider.verification_status}. Can only verify pending applications.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Verify the provider
+    provider.verification_status = 'VERIFIED'
+    provider.verified_by = user
+    provider.verification_date = timezone.now()
+    provider.verification_image = verification_image
+    provider.save()
+    
+    # Return updated provider details
+    serializer = ServiceProviderDetailSerializer(
+        provider,
+        context={'request': request}
+    )
+    
+    return Response({
+        'success': True,
+        'message': 'Provider service verified successfully',
+        'data': serializer.data
+    }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@parser_classes([MultiPartParser, FormParser])
+def submit_captain_verification(request):
+    """Submit captain verification documents (Public API)"""
+    
+    # Get form data - can use either phone or captain_code
+    phone = request.data.get('phone')
+    captain_code = request.data.get('captain_code')
+    aadhaar_front = request.FILES.get('aadhaar_front')
+    aadhaar_back = request.FILES.get('aadhaar_back')
+    
+    # At least one identifier is required
+    if not phone and not captain_code:
+        return Response({
+            'success': False,
+            'message': 'Either phone or captain_code is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not aadhaar_front:
+        return Response({
+            'success': False,
+            'message': 'aadhaar_front is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not aadhaar_back:
+        return Response({
+            'success': False,
+            'message': 'aadhaar_back is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Find user by phone or captain_code
+    try:
+        if captain_code:
+            user = User.objects.get(captain_code=captain_code.strip())
+        else:
+            user = User.objects.get(phone=phone.strip())
+    except User.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Captain not found with provided details'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user is captain
+    if not user.is_captain:
+        return Response({
+            'success': False,
+            'message': 'This user is not registered as a captain'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Check if already verified
+    if user.admin_verified:
+        return Response({
+            'success': False,
+            'message': 'Your captain account is already verified'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Use provided phone or user's registered phone
+    verification_phone = phone.strip() if phone else user.phone
+    
+    # Check if captain profile already exists
+    if hasattr(user, 'captain_profile'):
+        # Update existing profile
+        captain_profile = user.captain_profile
+        captain_profile.phone = verification_phone
+        captain_profile.aadhaar_front = aadhaar_front
+        captain_profile.aadhaar_back = aadhaar_back
+        captain_profile.verification_status = 'PENDING'
+        captain_profile.rejection_reason = ''
+        captain_profile.save()
+        message = 'Captain verification documents updated successfully. Please wait for admin verification.'
+    else:
+        # Create new profile
+        captain_profile = CaptainProfile.objects.create(
+            user=user,
+            phone=verification_phone,
+            aadhaar_front=aadhaar_front,
+            aadhaar_back=aadhaar_back,
+            verification_status='PENDING'
+        )
+        message = 'Captain verification documents submitted successfully. Please wait for admin verification.'
+    
+    return Response({
+        'success': True,
+        'message': message,
+        'data': {
+            'id': captain_profile.id,
+            'captain_name': user.name,
+            'captain_code': user.captain_code,
+            'phone': captain_profile.phone,
+            'verification_status': captain_profile.verification_status,
+            'admin_verified': user.admin_verified,
+            'submitted_at': captain_profile.updated_at
+        }
+    }, status=status.HTTP_200_OK)
