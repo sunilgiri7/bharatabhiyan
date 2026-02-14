@@ -100,6 +100,7 @@ def login(request):
             'success': False,
             'message': 'Your captain account is pending admin verification. Please submit your verification documents.',
             'user_id': user.id,
+            'captain_code': user.captain_code,  # Added captain_code
             'requires_verification': True,
             'admin_verified': False
         }, status=status.HTTP_403_FORBIDDEN)
