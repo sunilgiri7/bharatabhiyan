@@ -24,13 +24,13 @@ class ServiceTypeSerializer(serializers.ModelSerializer):
 
 
 class ServiceProviderCreateSerializer(serializers.ModelSerializer):
+    service_category = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=True
+    )
+    service_type = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=True
+    )
 
-    service_categories = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=True
-    )
-    service_types = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=True
-    )
     service_areas = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=True
     )
@@ -43,7 +43,8 @@ class ServiceProviderCreateSerializer(serializers.ModelSerializer):
             'whatsapp_number', 'business_name', 'experience',
             'business_address', 'city', 'pincode',
 
-            'service_categories', 'service_types',
+            # client fields
+            'service_category', 'service_type',
             'service_description', 'service_areas',
 
             'service_costs',
@@ -54,8 +55,8 @@ class ServiceProviderCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        categories = validated_data.pop('service_categories')
-        types = validated_data.pop('service_types')
+        categories = validated_data.pop('service_category')
+        types = validated_data.pop('service_type')
         areas = validated_data.pop('service_areas')
         service_costs = validated_data.pop('service_costs', [])
 
@@ -67,11 +68,11 @@ class ServiceProviderCreateSerializer(serializers.ModelSerializer):
             **validated_data
         )
 
+        # Map client keys -> actual M2M fields
         provider.service_categories.set(categories)
         provider.service_types.set(types)
         provider.service_areas.set(areas)
 
-        # 💰 Save pricing
         for cost in service_costs:
             ServicePricing.objects.create(
                 provider=provider,
@@ -83,13 +84,14 @@ class ServiceProviderCreateSerializer(serializers.ModelSerializer):
 
 
 class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
+    service_category = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
+    )
+    service_type = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
+    )
 
-    service_categories = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False
-    )
-    service_types = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False
-    )
+    # you already send service_areas=5 (single) -> ListField works fine in multipart
     service_areas = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False
     )
@@ -102,7 +104,8 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
             'whatsapp_number', 'business_name', 'experience',
             'business_address', 'city', 'pincode',
 
-            'service_categories', 'service_types',
+            # client fields
+            'service_category', 'service_type',
             'service_description', 'service_areas',
 
             'service_costs',
@@ -113,8 +116,8 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
-        categories = validated_data.pop('service_categories', None)
-        types = validated_data.pop('service_types', None)
+        categories = validated_data.pop('service_category', None)
+        types = validated_data.pop('service_type', None)
         areas = validated_data.pop('service_areas', None)
         service_costs = validated_data.pop('service_costs', None)
 
@@ -122,6 +125,7 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
+        # Map client keys -> actual M2M fields
         if categories is not None:
             instance.service_categories.set(categories)
 
@@ -131,10 +135,9 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
         if areas is not None:
             instance.service_areas.set(areas)
 
-        # 💰 Replace pricing cleanly
+        # Replace pricing cleanly
         if service_costs is not None:
             ServicePricing.objects.filter(provider=instance).delete()
-
             for cost in service_costs:
                 ServicePricing.objects.create(
                     provider=instance,
@@ -142,7 +145,7 @@ class ServiceProviderUpdateSerializer(serializers.ModelSerializer):
                     price=cost['price']
                 )
 
-        # 🔁 Reset verification on edit (your logic intact)
+        # Reset verification on edit
         instance.verification_status = 'DRAFT'
         instance.rejection_reason = ''
         instance.verified_by = None
