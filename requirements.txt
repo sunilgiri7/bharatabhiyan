@@ -48,3 +48,4 @@ pydantic_core==2.41.5
 typing_extensions==4.15.0
 typing-inspection==0.4.2
 annotated-types==0.7.0
+whitenoise
